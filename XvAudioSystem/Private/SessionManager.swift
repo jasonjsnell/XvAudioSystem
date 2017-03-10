@@ -20,7 +20,7 @@ class SessionManager:NSObject {
     // fastest is 0.005 ms @ 44.1kHz = 256  samples per slice
     internal var ioBufferDuration:TimeInterval = 0.005
     
-    let debug:Bool = false
+    let debug:Bool = true
     
     //MARK:- INIT -
     
@@ -71,6 +71,9 @@ class SessionManager:NSObject {
         
         Engine.sharedInstance.set(sampleRate: session.sampleRate)
         
+        if (debug) {print("AUDIO SESSION: Hardware sample rate =", session.sampleRate) }
+        
+        /*
         do {
             try session.setPreferredIOBufferDuration(ioBufferDuration)
             
@@ -79,6 +82,8 @@ class SessionManager:NSObject {
             print("AUDIO SESSION: Could not set preferred IOBuffer")
             return
         }
+ */
+        
         
         //MARK: Add listeners
         

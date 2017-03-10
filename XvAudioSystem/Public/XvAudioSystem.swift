@@ -130,7 +130,6 @@ public class XvAudioSystem{
          
             if channel.play(name: name, fileExtension: "wav", pitch:pitch) {
                 
-                
                 Utils.postNotification(
                     name: XvAudioConstants.kXvAudioPlaybackSuccess,
                     userInfo: nil)
@@ -162,9 +161,6 @@ public class XvAudioSystem{
         let percentageOfBusyChannels:Int = (100 * numberOfBusyChannels) / channelTotal
         
         return percentageOfBusyChannels
-        
-        //TODO: put this is audio system helper and listen to notification playSuccess
-        //VisualOutput.sharedInstance.animChannelUsage(percentageOfBusyChannels: percentageOfBusyChannels)
         
     }
     
