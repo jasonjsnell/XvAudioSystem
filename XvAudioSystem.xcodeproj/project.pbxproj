@@ -47,7 +47,6 @@
 				968607511E6F3F0A0011E7F2 /* XvAudioSystem.swift */,
 				9686075F1E6F41470011E7F2 /* XvAudioConstants.swift */,
 				9686075E1E6F3F220011E7F2 /* Private */,
-				968607471E6F3EEE0011E7F2 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
@@ -57,6 +56,7 @@
 				968607461E6F3EEE0011E7F2 /* XvAudioSystem.framework */,
 			);
 			name = Products;
+			path = ..;
 			sourceTree = "<group>";
 		};
 		9686075E1E6F3F220011E7F2 /* Private */ = {
@@ -68,6 +68,7 @@
 				968607551E6F3F1A0011E7F2 /* AudioComponentDescriptions.swift */,
 				968607581E6F3F1A0011E7F2 /* Utils.swift */,
 				96A43AF01E7033960061A387 /* Basics */,
+				968607471E6F3EEE0011E7F2 /* Products */,
 			);
 			name = Private;
 			path = XvAudioSystem;
