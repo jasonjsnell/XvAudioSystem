@@ -98,9 +98,11 @@ class Channel {
         
         //reset player
         success = _resetAudioPlayer()
+        if (debug) { print("AUDIO CHANNEL: Reset player before play", success) }
         
         //sets pitch on the sound that's just in this channel
         success =  _set(pitch:pitch)
+        if (debug) { print("AUDIO CHANNEL: Set pitch", success) }
         
         //load the file
         audioFile = _load(name:name, fileExtension:fileExtension)
@@ -120,6 +122,7 @@ class Channel {
                     if _initPlayer() {
                         
                         success = _startPlayer()
+                        if (debug) { print("AUDIO CHANNEL: Start playback", success) }
                     
                     }
                 }

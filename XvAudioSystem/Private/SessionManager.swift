@@ -20,7 +20,7 @@ class SessionManager:NSObject {
     // fastest is 0.005 ms @ 44.1kHz = 256  samples per slice
     internal var ioBufferDuration:TimeInterval = 0.005
     
-    let debug:Bool = true
+    let debug:Bool = false
     
     //MARK:- INIT -
     
@@ -38,6 +38,7 @@ class SessionManager:NSObject {
         let session:AVAudioSession = AVAudioSession.sharedInstance()
         
         // Request a hardware sample rate. The system may or may not be able to grant the request, depending on other audio activity on the device.
+        
         do {
             try session.setPreferredSampleRate(Engine.sharedInstance.getSampleRate())
             

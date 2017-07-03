@@ -54,7 +54,7 @@ public class XvAudioSystem{
     //blocks output during app interruptions (phone calls, timers)
     internal var interruptionInProgress:Bool = false
     
-    fileprivate let debug:Bool = false
+    fileprivate let debug:Bool = true
     
     //MARK: - PUBLIC API -
     //singleton code
@@ -118,17 +118,19 @@ public class XvAudioSystem{
  
          //MARK: playback
         
-         if (debug){
-            print("AUDIO SYS: Play sound \(name), volume:\(volume) pitch:\(pitch) pan:\(pan)")
-         }
+        
         
         
          if let channel:Channel = getChannel() {
             
             success = _set(volume: volume, forBus: channel.busNum)
             success = _set(pan: pan, forBus: channel.busNum)
-         
+            
             if channel.play(name: name, fileExtension: "wav", pitch:pitch) {
+                
+                if (debug){
+                    print("AUDIO SYS: Play sound \(name), volume:\(volume) pitch:\(pitch) pan:\(pan)")
+                }
                 
                 Utils.postNotification(
                     name: XvAudioConstants.kXvAudioPlaybackSuccess,
