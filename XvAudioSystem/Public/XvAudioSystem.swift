@@ -54,7 +54,7 @@ public class XvAudioSystem{
     //blocks output during app interruptions (phone calls, timers)
     internal var interruptionInProgress:Bool = false
     
-    fileprivate let debug:Bool = true
+    fileprivate let debug:Bool = false
     
     //MARK: - PUBLIC API -
     //singleton code
@@ -117,9 +117,6 @@ public class XvAudioSystem{
         }
  
          //MARK: playback
-        
-        
-        
         
          if let channel:Channel = getChannel() {
             
