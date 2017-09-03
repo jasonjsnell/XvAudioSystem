@@ -75,6 +75,7 @@ class SessionManager:NSObject {
         if (debug) {print("AUDIO SESSION: Hardware sample rate =", session.sampleRate) }
         
         /*
+         //using default
         do {
             try session.setPreferredIOBufferDuration(ioBufferDuration)
             

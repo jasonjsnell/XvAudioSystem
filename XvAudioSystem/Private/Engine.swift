@@ -8,6 +8,21 @@
 import Foundation
 import AudioToolbox
 
+
+func renderCallback(
+    
+    inRefCon: UnsafeMutableRawPointer,
+    ioActionFlags: UnsafeMutablePointer<AudioUnitRenderActionFlags>,
+    inTimeStamp: UnsafePointer<AudioTimeStamp>,
+    inBufNumber: UInt32,
+    inNumberFrames: UInt32,
+    ioData: Optional<UnsafeMutablePointer<AudioBufferList>>) -> Int32 {
+    
+    Utils.postNotification(name: XvAudioConstants.kXvAudioGraphRender, userInfo: nil)
+    return 0
+}
+
+
 class Engine {
     
     //MARK: - VARS -
@@ -50,7 +65,6 @@ class Engine {
             Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error starting engine", withStatus: result)
             return
         }
-        
     }
     
     //accessed by mixer during interruptions
@@ -65,7 +79,6 @@ class Engine {
                 return
             }
         }
-        
     }
     
     //accessed by audio session maanger and audio stream formats
@@ -76,6 +89,40 @@ class Engine {
     //accessed by audio session manager
     internal func set(sampleRate:Double){
         self.sampleRate = sampleRate
+    }
+    
+    internal func addRenderNotification(){
+        
+        let selfAsURP = UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        let selfAsUMRP = UnsafeMutableRawPointer(mutating:selfAsURP)
+        
+        let result:OSStatus = AUGraphAddRenderNotify(
+            processingGraph!,
+            renderCallback,
+            selfAsUMRP
+        )
+        
+        guard result == noErr else {
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error adding render notification", withStatus: result)
+            return
+        }
+    }
+    
+    internal func removeRenderNotification(){
+        
+        let selfAsURP = UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        let selfAsUMRP = UnsafeMutableRawPointer(mutating:selfAsURP)
+        
+        let result:OSStatus = AUGraphRemoveRenderNotify(
+            processingGraph!,
+            renderCallback,
+            selfAsUMRP
+        )
+        
+        guard result == noErr else {
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error removing render notification", withStatus: result)
+            return
+        }
     }
     
     
@@ -203,6 +250,7 @@ class Engine {
         
         _startGraph()
     }
+    
     
    
     //MARK: - HELPER SUB FUNCTIONS -

@@ -10,5 +10,6 @@ import Foundation
 
 public class XvAudioConstants {
     public static let kXvAudioPlaybackSuccess:String = "kXvAudioPlaybackSuccess"
+    public static let kXvAudioGraphRender:String = "kXvAudioGraphRender"
 }
 
