@@ -67,7 +67,7 @@ class Channel {
         // and is available
         
         if (currFrame == 0 && endFrame == 0){
-            if (debug) { print("AUDIO CHANNEL:",busNum,"At", currFrame,"of", endFrame, "<-- Avail") }
+            if (debug) { print("AUDIO CHANNEL:", busNum,"At", currFrame,"of", endFrame, "<-- Avail") }
             return true
         
         //if curr frame is beyond the end frame, then sound is done playing
@@ -77,7 +77,7 @@ class Channel {
             var closeSuccess:Bool = false
             closeSuccess = _resetAudioPlayer()
             closeSuccess = _closeFile()
-            if (debug) { print("AUDIO CHANNEL:",busNum,"At", currFrame,"of", endFrame, "?", closeSuccess) }
+            if (debug) { print("AUDIO CHANNEL:", busNum,"At", currFrame,"of", endFrame, "?", closeSuccess) }
             if (closeSuccess){
                 endFrame = 0
             }
@@ -85,7 +85,7 @@ class Channel {
             
         } else {
             //sound is still playing
-            if (debug) { print("AUDIO CHANNEL:",busNum,"At", currFrame,"of", endFrame) }
+            if (debug) { print("AUDIO CHANNEL:", busNum,"At", currFrame,"of", endFrame) }
             return false
         }
         
@@ -331,7 +331,7 @@ class Channel {
             }
             
         } else {
-            print("AUDIO CHANNEL:",busNum,"Invalid URL for sound file")
+            print("AUDIO CHANNEL:", busNum, "Invalid URL for sound file \(name).\(fileExtension)")
             return nil
         }
         
