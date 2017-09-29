@@ -102,7 +102,7 @@ class SessionManager:NSObject {
     //MARK: - LISTENERS -
         
     //MARK: Session interruption
-    func handleSessionInterruption(notification: NSNotification) {
+    @objc func handleSessionInterruption(notification: NSNotification) {
         
         if (debug) { print("AUDIO SESSION: Interruption notification") }
         
