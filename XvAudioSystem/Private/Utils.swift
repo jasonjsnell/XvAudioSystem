@@ -30,7 +30,7 @@ class Utils {
     
     //MARK: CHAR CONVERSTION
     class func fourCharCodeFrom(string : String) -> FourCharCode {
-        assert(string.characters.count == 4, "String length must be 4")
+        assert(string.count == 4, "String length must be 4")
         var result : FourCharCode = 0
         for char in string.utf16 {
             result = (result << 8) + FourCharCode(char)
