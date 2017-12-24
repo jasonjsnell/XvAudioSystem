@@ -54,7 +54,13 @@ public class XvAudioSystem{
     //blocks output during app interruptions (phone calls, timers)
     internal var interruptionInProgress:Bool = false
     
-    fileprivate let debug:Bool = true
+    //fade out during shutdown
+    fileprivate let FADE_OUT_SPEED:Double = 0.1
+    fileprivate let FADE_OUT_INC:Float = 0.05
+    fileprivate var _fadeOutChannelsTimer:Timer = Timer()
+    
+    
+    fileprivate let debug:Bool = false
     
     //MARK: - PUBLIC API -
     //singleton code
@@ -93,7 +99,7 @@ public class XvAudioSystem{
         
     }
     
-    //called by app delegate for audiobus fade out / shut down
+    //TODO: Future: use with audiobus access to IAA
     public func getRemoteIOAudioUnit() -> AudioUnit? {
         return remoteIoUnit
     }
@@ -192,10 +198,12 @@ public class XvAudioSystem{
         
         interruptionInProgress = false
         
-        //stop + start required to reboot engine
+        //stop fade out in case user left app and returned quickly, before the fade out is complete
+        _fadeOutChannelsTimer.invalidate()
+        
+        //restart engine if it's stopped
         if (engine != nil){
             
-            engine!.stopEngine()
             engine!.startEngine()
             
         } else {
@@ -206,25 +214,19 @@ public class XvAudioSystem{
     
 
     //MARK: - SHUTDOWN
-    
+
     public func shutdown(){
         
         if (debug) { print("AUDIO SYS: shutdown") }
         
-        
-        //stop engine
-        if (engine != nil){
-            
-            engine!.stopEngine()
-            
-        } else {
-            print("AUDIO SYS: Error shutting down engine because it is nil")
-        }
-        
-        //reset all the channels
-        for channel in channels {
-            channel.reset()
-        }
+        //fade out all the channels
+        _fadeOutChannelsTimer.invalidate()
+        _fadeOutChannelsTimer = Timer.scheduledTimer(
+            timeInterval: FADE_OUT_SPEED,
+            target: self,
+            selector: #selector(self._fadeOutChannels),
+            userInfo: nil,
+            repeats: true)
         
     }
     
@@ -271,7 +273,6 @@ public class XvAudioSystem{
             if (channel.isAvailable()){
                 return channel
             }
-            
         }
         
         //if none found, return nil
@@ -296,6 +297,20 @@ public class XvAudioSystem{
     }
     
     //MARK: - MAIN MIXER SETTERS
+    
+    fileprivate func _getVolume(forBus:Int) -> Float? {
+        
+        var volume:AudioUnitParameterValue = 0
+        
+        let result:OSStatus = AudioUnitGetParameter(mixerUnit!, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, UInt32(forBus), &volume)
+        
+        guard result == noErr else {
+            Utils.printErrorMessage(errorString: "AUDIO SYS: Error setting volume", withStatus: result)
+            return nil
+        }
+        
+        return Float(volume)
+    }
     
     fileprivate func _set(volume:Float, forBus:Int) -> Bool {
         
@@ -335,6 +350,71 @@ public class XvAudioSystem{
         }
         
         return true
+        
+    }
+    
+    //MARK: FADE OUT
+    
+    @objc internal func _fadeOutChannels(){
+        
+        //bool to test to see if any channels still need fading
+        var isAnyChannelAboveZero:Bool = false
+        
+        //loop through each channel each loop
+        for channel in channels {
+            
+            //get the current volume
+            if let volume:Float = _getVolume(forBus: channel.busNum) {
+                
+                //lower it
+                var loweredVolume:Float = volume - FADE_OUT_INC
+                
+                //if below zero, set to zero
+                if (loweredVolume < 0){
+                    loweredVolume = 0
+                
+                } else {
+                    
+                    //else channel is still above zero
+                    //bool keeps timer going
+                    isAnyChannelAboveZero = true
+                }
+                
+                //set the channel to the new, lowered volume
+                let _:Bool = _set(volume: loweredVolume, forBus: channel.busNum)
+            
+            } else {
+                
+                print("AUDIO SYS: Error getting volume for channel", channel.busNum, "during fadeOutChannels")
+            }
+        }
+        
+        //if all the chanenls are now at zero...
+        if (!isAnyChannelAboveZero){
+            
+            //stop the timer
+            _fadeOutChannelsTimer.invalidate()
+            
+            //execute complete func
+            _fadeOutComplete()
+        }
+    }
+    
+    fileprivate func _fadeOutComplete(){
+        
+        //reset all the channels
+        for channel in channels {
+            channel.reset()
+        }
+        
+        //stop engine
+        if (engine != nil){
+            
+            engine!.stopEngine()
+            
+        } else {
+            print("AUDIO SYS: Error shutting down engine because it is nil")
+        }
         
     }
     

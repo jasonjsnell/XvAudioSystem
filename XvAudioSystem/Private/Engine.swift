@@ -44,7 +44,7 @@ class Engine {
     // requests the desired hardware sample rate
     fileprivate var sampleRate:Double = 44100.0 // Hertz
     
-    fileprivate let debug:Bool = true
+    fileprivate let debug:Bool = false
     
     
     //MARK: - INIT -
@@ -60,24 +60,39 @@ class Engine {
     //accessed by mixer during interruptions
     internal func startEngine(){
         
-        let result:OSStatus = AUGraphStart(processingGraph!)
-        guard result == noErr else {
-            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error starting engine", withStatus: result)
-            return
+        
+        if (!_isGraphRunning()){
+            
+            if (debug) { print("AUDIO ENGINE: Start engine") }
+            
+            let result:OSStatus = AUGraphStart(processingGraph!)
+            guard result == noErr else {
+                Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error starting engine", withStatus: result)
+                return
+            }
+        
+        } else {
+            
+            if (debug) { print("AUDIO ENGINE: Engine already running") }
         }
+        
     }
     
     //accessed by mixer during interruptions
     internal func stopEngine(){
         
-        //stop if it's running
-        //note: running always seems to be true
         if (_isGraphRunning()){
+            
+            if (debug) { print("AUDIO ENGINE: Stop engine") }
+            
             let result:OSStatus = AUGraphStop(processingGraph!)
             guard result == noErr else {
                 Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error stopping engine", withStatus: result)
                 return
             }
+        } else {
+            
+            if (debug) { print("AUDIO ENGINE: Engine already stopped") }
         }
     }
     
@@ -307,9 +322,20 @@ class Engine {
         
     }
     
+    /*
+     private func startAudioUnitGraph() {
+     var isRunning:Boolean = 0
+     AUGraphIsRunning(self.processingGraph, &isRunning)
+     if isRunning == 0 {
+     var status:OSStatus = AUGraphStart(self.processingGraph)
+     assert(status == noErr, "Could not start Audio Unit Graph")
+     }
+     }
+     */
+    
     fileprivate func _isGraphRunning() -> Bool {
         
-        var isGraphRunning: DarwinBoolean = false
+        var isGraphRunning:DarwinBoolean = DarwinBoolean(false)
         let result:OSStatus = AUGraphIsRunning(processingGraph!, &isGraphRunning)
         guard result == noErr else {
             Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error seeing if engine is runing", withStatus: result)
