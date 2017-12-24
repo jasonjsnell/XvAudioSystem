@@ -44,7 +44,7 @@ class Engine {
     // requests the desired hardware sample rate
     fileprivate var sampleRate:Double = 44100.0 // Hertz
     
-    fileprivate let debug:Bool = false
+    fileprivate let debug:Bool = true
     
     
     //MARK: - INIT -
