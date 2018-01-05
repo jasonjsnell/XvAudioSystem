@@ -50,11 +50,11 @@ class SessionManager:NSObject {
         
         // Request the audio session category
         do {
-            try session.setCategory(AVAudioSessionCategoryPlayback, with: .mixWithOthers)
+            try session.setCategory(AVAudioSessionCategoryMultiRoute, with: .mixWithOthers)
             
         } catch {
             
-            print("AUDIO SESSION: Could not set session category")
+            print("AUDIO SESSION: Error: Could not set session category")
             return
         }
         
