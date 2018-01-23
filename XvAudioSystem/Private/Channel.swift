@@ -144,73 +144,82 @@ class Channel {
         
         if var _audioFile:AudioFileID = audioFile {
             
-            //load file into player
-            var result:OSStatus = AudioUnitSetProperty(
-                playerUnit!,
-                kAudioUnitProperty_ScheduledFileIDs,
-                kAudioUnitScope_Global,
-                0,
-                &_audioFile,
-                UInt32(MemoryLayout.size(ofValue: _audioFile))
-            )
-            
-            guard result == noErr else {
-                Utils.printErrorMessage(errorString: "AUDIO CHANNEL: Error setting audio file scheduled IDs", withStatus: result)
+            if (playerUnit != nil) {
+                
+                //load file into player
+                var result:OSStatus = AudioUnitSetProperty(
+                    playerUnit!,
+                    kAudioUnitProperty_ScheduledFileIDs,
+                    kAudioUnitScope_Global,
+                    0,
+                    &_audioFile,
+                    UInt32(MemoryLayout.size(ofValue: _audioFile))
+                )
+                
+                guard result == noErr else {
+                    Utils.printErrorMessage(errorString: "AUDIO CHANNEL: Error setting audio file scheduled IDs", withStatus: result)
+                    return false
+                }
+                
+                //get time stamp zero
+                var regionTimeStamp:AudioTimeStamp = AudioTimeStamp()
+                regionTimeStamp.mFlags = AudioTimeStampFlags.sampleTimeValid
+                regionTimeStamp.mSampleTime = 0
+                
+                //init region zero
+                var region = PatchedScheduledAudioFileRegion(
+                    mTimeStamp: regionTimeStamp,
+                    mCompletionProc: nil,
+                    mCompletionProcUserData: nil,
+                    mAudioFile: audioFile,
+                    mLoopCount: 0,
+                    mStartFrame: 0,
+                    mFramesToPlay: endFrame
+                )
+                
+                //set the region
+                result = AudioUnitSetProperty(
+                    playerUnit!,
+                    kAudioUnitProperty_ScheduledFileRegion,
+                    kAudioUnitScope_Global,
+                    0,
+                    &region,
+                    UInt32(MemoryLayout.size(ofValue: region))
+                )
+                
+                guard result == noErr else {
+                    Utils.printErrorMessage(errorString: "AUDIO CHANNEL: Error setting file region", withStatus: result)
+                    return false
+                }
+                
+                // set prime to zero
+                var defaultVal:UInt32 = 0
+                
+                result = AudioUnitSetProperty(
+                    playerUnit!,
+                    kAudioUnitProperty_ScheduledFilePrime,
+                    kAudioUnitScope_Global,
+                    0,
+                    &defaultVal,
+                    UInt32(MemoryLayout.size(ofValue: defaultVal))
+                )
+                
+                guard result == noErr else {
+                    Utils.printErrorMessage(errorString: "AUDIO CHANNEL: Error setting file prime", withStatus: result)
+                    return false
+                }
+                
+                return true
+                
+            } else {
+                print("AUDIO CHANNEL:", busNum, "Player unit is nil")
                 return false
             }
             
-            //get time stamp zero
-            var regionTimeStamp:AudioTimeStamp = AudioTimeStamp()
-            regionTimeStamp.mFlags = AudioTimeStampFlags.sampleTimeValid
-            regionTimeStamp.mSampleTime = 0
             
-            //init region zero
-            var region = PatchedScheduledAudioFileRegion(
-                mTimeStamp: regionTimeStamp,
-                mCompletionProc: nil,
-                mCompletionProcUserData: nil,
-                mAudioFile: audioFile,
-                mLoopCount: 0,
-                mStartFrame: 0,
-                mFramesToPlay: endFrame
-            )
-            
-            //set the region
-            result = AudioUnitSetProperty(
-                playerUnit!,
-                kAudioUnitProperty_ScheduledFileRegion,
-                kAudioUnitScope_Global,
-                0,
-                &region,
-                UInt32(MemoryLayout.size(ofValue: region))
-            )
-            
-            guard result == noErr else {
-                Utils.printErrorMessage(errorString: "AUDIO CHANNEL: Error setting file region", withStatus: result)
-                return false
-            }
-            
-            // set prime to zero
-            var defaultVal:UInt32 = 0
-            
-            result = AudioUnitSetProperty(
-                playerUnit!,
-                kAudioUnitProperty_ScheduledFilePrime,
-                kAudioUnitScope_Global,
-                0,
-                &defaultVal,
-                UInt32(MemoryLayout.size(ofValue: defaultVal))
-            )
-            
-            guard result == noErr else {
-                Utils.printErrorMessage(errorString: "AUDIO CHANNEL: Error setting file prime", withStatus: result)
-                return false
-            }
-            
-            return true
             
         } else {
-            print("AUDIO CHANNEL:",busNum,"Error invalid file init player")
+            print("AUDIO CHANNEL:", busNum, "Error invalid file init player")
             return false
         }
         
