@@ -12,6 +12,8 @@ import Foundation
 import AVFoundation
 
 class SessionManager:NSObject {
+    
+    var objPlayer: AVAudioPlayer?
 
     //MARK: - VARS
 
@@ -20,7 +22,7 @@ class SessionManager:NSObject {
     // fastest is 0.005 ms @ 44.1kHz = 256  samples per slice
     internal var ioBufferDuration:TimeInterval = 0.005
     
-    let debug:Bool = false
+    let debug:Bool = true
     
     //MARK:- INIT -
     
@@ -48,15 +50,29 @@ class SessionManager:NSObject {
             return
         }
         
-        // Request the audio session category
+        //bluetooth and AVAudioSessionCategoryMultiRoute do not work together
+        //https://stackoverflow.com/questions/28615964/how-to-use-avaudiosessioncategorymultiroute-with-a-bluetooth-device
+        
+        //let category:String = AVAudioSessionCategoryMultiRoute
+        let category:String = AVAudioSessionCategoryPlayback
+        let options:AVAudioSessionCategoryOptions  = [
+            AVAudioSessionCategoryOptions.mixWithOthers
+        ]
+        
+        
+        
+        // Set the audio session category
         do {
-            try session.setCategory(AVAudioSessionCategoryMultiRoute, with: .mixWithOthers)
+            
+            try session.setCategory(category, with: options)
             
         } catch {
             
-            print("AUDIO SESSION: Error: Could not set session category")
+            print("AUDIO SESSION: Error: Could not set session category", error.localizedDescription)
+            print(error.localizedDescription)
             return
         }
+        
         
         // Request activation of your audio session
         do {
@@ -95,7 +111,7 @@ class SessionManager:NSObject {
             selector: #selector(SessionManager.handleSessionInterruption(notification:)),
             name: NSNotification.Name.AVAudioSessionInterruption,
             object: session)
-        
+    
     }
    
     

@@ -392,7 +392,7 @@ class Engine {
         
         var unit:AudioUnit? = nil
         
-        let result:OSStatus = AUGraphNodeInfo(
+        var result:OSStatus = AUGraphNodeInfo(
             processingGraph!,
             inNode,
             nil,
@@ -401,6 +401,25 @@ class Engine {
         
         guard result == noErr else {
             Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error making unit", withStatus: result)
+            return nil
+        }
+        
+        //every audio unit needs to have a 4096 max fps in order to continue playing when the screen is locked
+        //https://developer.apple.com/library/content/qa/qa1606/_index.html
+        
+        var maximumFramesPerSlice: UInt32 = 4096
+        
+        result = AudioUnitSetProperty(
+            unit!,
+            kAudioUnitProperty_MaximumFramesPerSlice,
+            kAudioUnitScope_Global,
+            0,
+            &maximumFramesPerSlice,
+            UInt32(MemoryLayout.size(ofValue: maximumFramesPerSlice))
+        )
+        
+        guard result == noErr else {
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error setting maximum fps", withStatus: result)
             return nil
         }
         
@@ -421,7 +440,9 @@ class Engine {
     fileprivate func _makePlayerUnit(inChannel:Int, withFormat:AudioStreamBasicDescription) -> AudioUnit? {
      
         //make a player unit with the incoming format and scope
+    
         if let playerUnit:AudioUnit = _makeUnit(inNode: playerNodes[inChannel]) {
+            
             _set(unit: playerUnit, withFormat: withFormat, inScope: kAudioUnitScope_Output, inElement: 0)
             return playerUnit
         }
@@ -459,27 +480,7 @@ class Engine {
                 return nil
             }
             
-            
-            // Increase the maximum frames per slice allows the mixer unit to accommodate the larger slice size used when the screen is locked.
-            
-            var maximumFramesPerSlice: UInt32 = 4096
-            
-            result = AudioUnitSetProperty(
-                mixerUnit,
-                kAudioUnitProperty_MaximumFramesPerSlice,
-                kAudioUnitScope_Global,
-                0,
-                &maximumFramesPerSlice,
-                UInt32(MemoryLayout.size(ofValue: maximumFramesPerSlice))
-            )
-            
-            guard result == noErr else {
-                Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error setting mixer's frames per slice", withStatus: result)
-                return nil
-            }
-            
             // Required by Audio Units: Setting mixer output sample rate.
-            
             result = AudioUnitSetProperty(
                 mixerUnit,
                 kAudioUnitProperty_SampleRate,
