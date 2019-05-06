@@ -53,18 +53,19 @@ class SessionManager:NSObject {
         //bluetooth and AVAudioSessionCategoryMultiRoute do not work together
         //https://stackoverflow.com/questions/28615964/how-to-use-avaudiosessioncategorymultiroute-with-a-bluetooth-device
         
-        //let category:String = AVAudioSessionCategoryMultiRoute
-        let category:String = AVAudioSessionCategoryPlayback
-        let options:AVAudioSessionCategoryOptions  = [
-            AVAudioSessionCategoryOptions.mixWithOthers
+        
+        let options:AVAudioSession.CategoryOptions  = [
+            AVAudioSession.CategoryOptions.mixWithOthers
         ]
-        
-        
         
         // Set the audio session category
         do {
             
-            try session.setCategory(category, with: options)
+            try session.setCategory(
+                .playback,
+                mode: .default,
+                options: options
+            )
             
         } catch {
             
@@ -109,7 +110,7 @@ class SessionManager:NSObject {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(SessionManager.handleSessionInterruption(notification:)),
-            name: NSNotification.Name.AVAudioSessionInterruption,
+            name: AVAudioSession.interruptionNotification,
             object: session)
     
     }
@@ -125,7 +126,7 @@ class SessionManager:NSObject {
         //get interruption phase (began or ended) from its type key
         let interruptionType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as! UInt
         
-        if (interruptionType == AVAudioSessionInterruptionType.began.rawValue) {
+        if (interruptionType == AVAudioSession.InterruptionType.began.rawValue) {
             
             // interruption began
             
@@ -133,7 +134,7 @@ class SessionManager:NSObject {
             
             XvAudioSystem.sharedInstance.beginInterruption()
             
-        } else if (interruptionType == AVAudioSessionInterruptionType.ended.rawValue) {
+        } else if (interruptionType == AVAudioSession.InterruptionType.ended.rawValue) {
             
             // interruption ended
             
@@ -141,7 +142,7 @@ class SessionManager:NSObject {
             
             
             let interruptionOption = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as! UInt
-            if interruptionOption == AVAudioSessionInterruptionOptions.shouldResume.rawValue {
+            if interruptionOption == AVAudioSession.InterruptionOptions.shouldResume.rawValue {
                 
                 // resume if needed
                 if (debug) { print("AUDIO SESSION: Session should resume") }
@@ -154,4 +155,9 @@ class SessionManager:NSObject {
     
         
     
+}
+
+// Helper function inserted by Swift 4.2 migrator.
+fileprivate func convertFromAVAudioSessionCategory(_ input: AVAudioSession.Category) -> String {
+	return input.rawValue
 }

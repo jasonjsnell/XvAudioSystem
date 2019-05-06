@@ -18,6 +18,63 @@ func renderCallback(
     inNumberFrames: UInt32,
     ioData: Optional<UnsafeMutablePointer<AudioBufferList>>) -> Int32 {
     
+    //grab var for reference
+    let hostCallbackInfo:HostCallbackInfo = Engine.sharedInstance.hostCallbackInfo
+    
+    //if hostUserData is not nil, it means hostCallbackInfo has successfully been init'd
+    if (hostCallbackInfo.hostUserData != nil){
+        
+        //init vars
+        var outIsPlaying:DarwinBoolean = false
+        var outCurrentSampleInTimeLine:Float64 = 0
+        
+        /*call transport state proc 2
+        pass in host user data (probably to let it know which host it is)
+        outIsPlaying is whether host is currently playing or not
+        outCurrentSampleInTimeline is a number showing how long the play button has been running
+        If it's negative, the rewind button has been pressed during playback
+         If it's 0, the rewind button has been pressed
+         */
+        
+        let result = hostCallbackInfo.transportStateProc2!(
+            hostCallbackInfo.hostUserData,
+            &outIsPlaying,
+            nil, //outIsRecording
+            nil,
+            &outCurrentSampleInTimeLine,
+            nil,
+            nil,
+            nil)
+        
+        //if result is nil, it means there is no host, or host data is inaccessible
+        if (result == noErr){
+            
+            //grab var for ref
+            let hostIsPlaying:Bool = Engine.sharedInstance.hostIsPlaying
+            
+            //if host var is false and transport isPlaying is true
+            if (!hostIsPlaying && outIsPlaying.boolValue){
+                
+                //update var
+                Engine.sharedInstance.hostIsPlaying = true
+                
+                //post notification that playback has started
+                Utils.postNotification(
+                    name: XvAudioConstants.kXvAudioHostPlayButtonPressed,
+                    userInfo: nil)
+                
+            } else if (hostIsPlaying && !outIsPlaying.boolValue){
+                
+                Engine.sharedInstance.hostIsPlaying = false
+                
+                //post notification that playback has started
+                Utils.postNotification(
+                    name: XvAudioConstants.kXvAudioHostPauseButtonPressed,
+                    userInfo: nil)
+            }
+        }
+    }
+    
     Utils.postNotification(name: XvAudioConstants.kXvAudioGraphRender, userInfo: nil)
     return 0
 }
@@ -26,6 +83,7 @@ func renderCallback(
 class Engine {
     
     //MARK: - VARS -
+    
     
     //augraph for all audio processing
     fileprivate var processingGraph: AUGraph? = nil
@@ -36,11 +94,16 @@ class Engine {
     fileprivate var mixerNode:AUNode = 0
     fileprivate var remoteIoNode:AUNode = 0
     
+    //host call back info
+    fileprivate var hostCallbackInfo:HostCallbackInfo = HostCallbackInfo()
+    fileprivate var hostIsPlaying:Bool = false
+    
     //formats
     fileprivate var pitchFormat:AudioStreamBasicDescription = AudioStreamBasicDescription()
     
     //set by mixer during init
     fileprivate var channelTotal:Int = 1
+    
     // requests the desired hardware sample rate
     fileprivate var sampleRate:Double = 44100.0 // Hertz
     
@@ -52,6 +115,7 @@ class Engine {
     //singleton code
     static let sharedInstance = Engine()
     fileprivate init() {
+        
         
     }
     
@@ -156,6 +220,9 @@ class Engine {
         //Create an AUGraph
         _makeNewGraph()
         
+        //add render notication (used in IAA host callback, which detects transport changes
+        addRenderNotification()
+        
         // Add nodes in reverse order, last io output is added first
         let ioDesc:AudioComponentDescription = AudioComponentDescriptions.getRemoteIoDescription()
         remoteIoNode = makeNode(withDescription: ioDesc)
@@ -188,10 +255,6 @@ class Engine {
         //create blank array
         var channels:[Channel] = []
         
-        
-            //grab its format
-        
-                
             //create loop
             for channel in 0..<channelTotal {
                 
@@ -217,9 +280,6 @@ class Engine {
                     print("AUDIO ENGINE: Error getting pitch unit")
                 }
             }
-            
-           
-       
         
         return channels
         
@@ -234,9 +294,25 @@ class Engine {
     }
     
     //MARK: 4. Init and retrieve remoteIO unit
+    //called by audio system and result passed to Audiobus for its init
     internal func getRemoteIoUnit() -> AudioUnit? {
        
-        return _makeRemoteIoUnit()
+        //make local remoteIoUnit
+        if let _remoteIoUnit:AudioUnit = _makeRemoteIoUnit() {
+            
+            //create host callback info from remoteIo unit
+            if let _hostCallbackInfo:HostCallbackInfo = _getHostCallbackInfo(fromUnit: _remoteIoUnit) {
+                
+                //store, to access later in render callback
+                hostCallbackInfo = _hostCallbackInfo
+            }
+            
+            //return unit to caller
+            return _remoteIoUnit
+        }
+        
+        return nil
+        //return _makeRemoteIoUnit()
     }
      
      // MARK: 5. Connect nodes
@@ -322,17 +398,6 @@ class Engine {
         
     }
     
-    /*
-     private func startAudioUnitGraph() {
-     var isRunning:Boolean = 0
-     AUGraphIsRunning(self.processingGraph, &isRunning)
-     if isRunning == 0 {
-     var status:OSStatus = AUGraphStart(self.processingGraph)
-     assert(status == noErr, "Could not start Audio Unit Graph")
-     }
-     }
-     */
-    
     fileprivate func _isGraphRunning() -> Bool {
         
         var isGraphRunning:DarwinBoolean = DarwinBoolean(false)
@@ -364,6 +429,7 @@ class Engine {
         }
         
         return _node
+        
     }
     
     fileprivate func _connect(sourceNode:AUNode, sourceBus:UInt32, destinationNode:AUNode, destinationBus:UInt32) {
@@ -579,6 +645,30 @@ class Engine {
         
         return format
         
+    }
+    
+    //MARK: Host callback info
+    fileprivate func _getHostCallbackInfo(fromUnit:AudioUnit) -> HostCallbackInfo? {
+        
+        //https://forum.juce.com/t/audiobus/10717/35
+        var hostCallbackInfo:HostCallbackInfo = HostCallbackInfo()
+        var hostCallbackInfoSize:UInt32 = UInt32(MemoryLayout.size(ofValue: hostCallbackInfo))
+        
+        let result:OSStatus = AudioUnitGetProperty(
+            fromUnit,
+            kAudioUnitProperty_HostCallbacks,
+            kAudioUnitScope_Global,
+            0,
+            &hostCallbackInfo,
+            &hostCallbackInfoSize
+        )
+        
+        guard result == noErr else {
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error getting host callback info", withStatus: result)
+            return nil
+        }
+        
+        return hostCallbackInfo
     }
     
     
