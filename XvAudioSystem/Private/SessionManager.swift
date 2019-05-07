@@ -114,7 +114,7 @@ class SessionManager:NSObject {
             object: session)
     
     }
-   
+
     
     //MARK: - LISTENERS -
         
