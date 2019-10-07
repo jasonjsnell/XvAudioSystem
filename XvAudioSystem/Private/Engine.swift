@@ -75,7 +75,8 @@ func renderCallback(
         }
     }
     
-    Utils.postNotification(name: XvAudioConstants.kXvAudioGraphRender, userInfo: nil)
+    //system is using a timer for rendering, not this
+    //Utils.postNotification(name: XvAudioConstants.kXvAudioGraphRender, userInfo: nil)
     return 0
 }
 
@@ -129,11 +130,14 @@ class Engine {
             
             if (debug) { print("AUDIO ENGINE: Start engine") }
             
-            let result:OSStatus = AUGraphStart(processingGraph!)
-            guard result == noErr else {
-                Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error starting engine", withStatus: result)
-                return
+            var result:OSStatus? = AUGraphStart(processingGraph!)
+            
+            if (result == nil){ print("AUDIO ENGINE: nil result during startEngine") }
+            
+            if (result != noErr){
+                Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error starting engine", withStatus: result!)
             }
+            result  = nil
         
         } else {
             
@@ -149,11 +153,15 @@ class Engine {
             
             if (debug) { print("AUDIO ENGINE: Stop engine") }
             
-            let result:OSStatus = AUGraphStop(processingGraph!)
-            guard result == noErr else {
-                Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error stopping engine", withStatus: result)
-                return
+            var result:OSStatus? = AUGraphStop(processingGraph!)
+            
+            if (result == nil){ print("AUDIO ENGINE: nil result during stopEngine") }
+            
+            if (result != noErr){
+                Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error stopping engine", withStatus: result!)
             }
+            result = nil
+            
         } else {
             
             if (debug) { print("AUDIO ENGINE: Engine already stopped") }
@@ -175,16 +183,18 @@ class Engine {
         let selfAsURP = UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
         let selfAsUMRP = UnsafeMutableRawPointer(mutating:selfAsURP)
         
-        let result:OSStatus = AUGraphAddRenderNotify(
+        var result:OSStatus? = AUGraphAddRenderNotify(
             processingGraph!,
             renderCallback,
             selfAsUMRP
         )
         
-        guard result == noErr else {
-            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error adding render notification", withStatus: result)
-            return
+        if (result == nil){ print("AUDIO ENGINE: nil result during addRenderNotification") }
+        
+        if (result != noErr){
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error adding render notification", withStatus: result!)
         }
+        result = nil
     }
     
     internal func removeRenderNotification(){
@@ -192,16 +202,18 @@ class Engine {
         let selfAsURP = UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
         let selfAsUMRP = UnsafeMutableRawPointer(mutating:selfAsURP)
         
-        let result:OSStatus = AUGraphRemoveRenderNotify(
+        var result:OSStatus? = AUGraphRemoveRenderNotify(
             processingGraph!,
             renderCallback,
             selfAsUMRP
         )
         
-        guard result == noErr else {
-            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error removing render notification", withStatus: result)
-            return
+        if (result == nil){ print("AUDIO ENGINE: nil result during removeRenderNotification") }
+        
+        if (result != noErr){
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error removing render notification", withStatus: result!)
         }
+        result = nil
     }
     
     
@@ -351,26 +363,28 @@ class Engine {
         
         if (debug) { print("AUDIO ENGINE: Make new graph") }
         
-        let result:OSStatus = NewAUGraph(&processingGraph)
+        var result:OSStatus? = NewAUGraph(&processingGraph)
         
-        guard result == noErr else {
-            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error creating graph", withStatus: result)
-            return
+        if (result == nil){ print("AUDIO ENGINE: nil result during _makeNewGraph") }
+        
+        if (result != noErr){
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error creating graph", withStatus: result!)
         }
-        
+        result = nil
     }
     
     fileprivate func _openGraph(){
         
         if (debug) { print("AUDIO ENGINE: Open graph") }
         
-        let result:OSStatus = AUGraphOpen(processingGraph!)
+        var result:OSStatus? = AUGraphOpen(processingGraph!)
         
-        guard result == noErr else {
-            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error opening graph", withStatus: result)
-            return
+        if (result == nil){ print("AUDIO ENGINE: nil result during _openGraph") }
+        
+        if (result! != noErr){
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error opening graph", withStatus: result!)
         }
-        
+        result = nil
     }
     
     fileprivate func _startGraph(){
@@ -385,12 +399,14 @@ class Engine {
         // configures audio data stream formats for each input and output
         // validates connections between audio units
         
-        let result:OSStatus = AUGraphInitialize(processingGraph!)
+        var result:OSStatus? = AUGraphInitialize(processingGraph!)
         
-        guard result == noErr else {
-            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error initializing graph", withStatus: result)
-            return
+        if (result == nil){ print("AUDIO ENGINE: nil result during _startGraph") }
+        
+        if (result! != noErr){
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error initializing graph", withStatus: result!)
         }
+        result = nil
         
         // start graph
         if (debug) { print("AUDIO ENGINE: Start") }
@@ -401,11 +417,15 @@ class Engine {
     fileprivate func _isGraphRunning() -> Bool {
         
         var isGraphRunning:DarwinBoolean = DarwinBoolean(false)
-        let result:OSStatus = AUGraphIsRunning(processingGraph!, &isGraphRunning)
-        guard result == noErr else {
-            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error seeing if engine is runing", withStatus: result)
-            return false
+        
+        var result:OSStatus? = AUGraphIsRunning(processingGraph!, &isGraphRunning)
+        
+        if (result == nil){ print("AUDIO ENGINE: nil result during _isGraphRunning") }
+        
+        if (result! != noErr){
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error seeing if engine is runing", withStatus: result!)
         }
+        result = nil
         
         return isGraphRunning.boolValue
     }
@@ -418,23 +438,27 @@ class Engine {
         var _node:AUNode = 0
         var _desc:AudioComponentDescription = withDescription
         
-        let result:OSStatus = AUGraphAddNode(
+        var result:OSStatus? = AUGraphAddNode(
             processingGraph!,
             &_desc,
             &_node)
         
-        guard result == noErr else {
-            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error adding I/O node", withStatus: result)
+        if (result == nil){ print("AUDIO ENGINE: nil result during makeNode") }
+        
+        if (result != noErr){
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error adding I/O node", withStatus: result!)
+            result = nil
             return 0
         }
         
+        result = nil
         return _node
         
     }
     
     fileprivate func _connect(sourceNode:AUNode, sourceBus:UInt32, destinationNode:AUNode, destinationBus:UInt32) {
         
-        let result:OSStatus = AUGraphConnectNodeInput (
+        var result:OSStatus? = AUGraphConnectNodeInput (
             processingGraph!,
             sourceNode,         // source node
             sourceBus,          // source node output bus number
@@ -442,10 +466,12 @@ class Engine {
             destinationBus      // desintation node input bus number
         )
         
-        guard result == noErr else {
-            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error nodes", withStatus: result)
-            return
+        if (result == nil){ print("AUDIO ENGINE: nil result during _connect") }
+        
+        if (result != noErr){
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error nodes", withStatus: result!)
         }
+        result = nil
         
     }
     
@@ -458,15 +484,18 @@ class Engine {
         
         var unit:AudioUnit? = nil
         
-        var result:OSStatus = AUGraphNodeInfo(
+        var result:OSStatus? = AUGraphNodeInfo(
             processingGraph!,
             inNode,
             nil,
             &unit
         )
         
-        guard result == noErr else {
-            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error making unit", withStatus: result)
+        if (result == nil){ print("AUDIO ENGINE: nil result during _makeUnit") }
+        
+        if (result != noErr){
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error making unit", withStatus: result!)
+            result = nil
             return nil
         }
         
@@ -484,11 +513,13 @@ class Engine {
             UInt32(MemoryLayout.size(ofValue: maximumFramesPerSlice))
         )
         
-        guard result == noErr else {
-            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error setting maximum fps", withStatus: result)
+        if (result != noErr){
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error setting maximum fps", withStatus: result!)
+            result = nil
             return nil
         }
         
+        result = nil
         return unit
 
     }
@@ -522,7 +553,7 @@ class Engine {
         
         if (debug) { print("AUDIO ENGINE: Init mixer unit") }
         
-        var result:OSStatus = noErr
+        var result:OSStatus? = noErr
         
         //init audio unit
         
@@ -541,8 +572,11 @@ class Engine {
                 UInt32(MemoryLayout.size(ofValue: channelCount))
             )
             
-            guard result == noErr else {
-                Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error setting mixer's channel count", withStatus: result)
+            if (result == nil){ print("AUDIO ENGINE: nil result during _makeMixerUnit set channel count") }
+            
+            if (result != noErr){
+                Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error setting mixer's channel count", withStatus: result!)
+                result = nil
                 return nil
             }
             
@@ -556,8 +590,11 @@ class Engine {
                 UInt32(MemoryLayout.size(ofValue: sampleRate))
             )
             
-            guard result == noErr else {
-                Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error setting mixer's sample rate", withStatus: result)
+            if (result == nil){ print("AUDIO ENGINE: nil result during _makeMixerUnit set sample rate") }
+            
+            if (result != noErr){
+                Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error setting mixer's sample rate", withStatus: result!)
+                result = nil
                 return nil
             }
             
@@ -572,11 +609,15 @@ class Engine {
                 0
             )
             
-            guard result == noErr else {
-                Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error setting mixer's volume", withStatus: result)
+            if (result == nil){ print("AUDIO ENGINE: nil result during _makeMixerUnit set volume") }
+            
+            if (result != noErr){
+                Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error setting mixer's volume", withStatus: result!)
+                result = nil
                 return nil
             }
             
+            result = nil
             
             //loop through each input on main mixer and set input stream format
             
@@ -591,9 +632,6 @@ class Engine {
         }
         
         return nil
-        
-        
-        
     }
 
     
@@ -605,7 +643,7 @@ class Engine {
 
         var _format:AudioStreamBasicDescription = withFormat
         
-        let result:OSStatus = AudioUnitSetProperty(
+        var result:OSStatus? = AudioUnitSetProperty(
             unit,
             kAudioUnitProperty_StreamFormat,
             inScope,
@@ -614,10 +652,12 @@ class Engine {
             UInt32(MemoryLayout.size(ofValue: _format))
         )
         
-        guard result == noErr else {
-            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error setting stream format", withStatus: result)
-            return
+        if (result == nil){ print("AUDIO ENGINE: nil result during _set", withFormat) }
+        
+        if (result != noErr){
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error setting stream format", withStatus: result!)
         }
+        result = nil
         
     }
     
@@ -629,7 +669,7 @@ class Engine {
         var format:AudioStreamBasicDescription = AudioStreamBasicDescription()
         var formatSize:UInt32 = UInt32(MemoryLayout.size(ofValue: format))
         
-        let result:OSStatus = AudioUnitGetProperty(
+        var result:OSStatus? = AudioUnitGetProperty(
             fromUnit,
             kAudioUnitProperty_StreamFormat,
             kAudioUnitScope_Input,
@@ -638,11 +678,15 @@ class Engine {
             &formatSize
         )
         
-        guard result == noErr else {
-            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error getting unit format", withStatus: result)
+        if (result == nil){ print("AUDIO ENGINE: nil result during _getFormat") }
+        
+        if (result != noErr){
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error getting unit format", withStatus: result!)
+            result = nil
             return nil
         }
         
+        result = nil
         return format
         
     }
@@ -654,7 +698,7 @@ class Engine {
         var hostCallbackInfo:HostCallbackInfo = HostCallbackInfo()
         var hostCallbackInfoSize:UInt32 = UInt32(MemoryLayout.size(ofValue: hostCallbackInfo))
         
-        let result:OSStatus = AudioUnitGetProperty(
+        var result:OSStatus? = AudioUnitGetProperty(
             fromUnit,
             kAudioUnitProperty_HostCallbacks,
             kAudioUnitScope_Global,
@@ -663,11 +707,15 @@ class Engine {
             &hostCallbackInfoSize
         )
         
-        guard result == noErr else {
-            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error getting host callback info", withStatus: result)
+        if (result == nil){ print("AUDIO ENGINE: nil result during _getHostCallbackInfo") }
+        
+        if (result != noErr){
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error getting host callback info", withStatus: result!)
+            result = nil
             return nil
         }
         
+        result = nil
         return hostCallbackInfo
     }
     
@@ -675,6 +723,15 @@ class Engine {
     
     //MARK: deinit
     deinit {
+        
+        var result:OSStatus? = AUGraphUninitialize(processingGraph!)
+        
+        if (result == nil){ print("AUDIO ENGINE: nil result during uninitialize graph") }
+        
+        if (result! != noErr){
+            Utils.printErrorMessage(errorString: "AUDIO ENGINE: Error uninitializing graph", withStatus: result!)
+        }
+        result = nil
         
         processingGraph = nil
         playerNodes = []

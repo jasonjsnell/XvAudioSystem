@@ -10,7 +10,7 @@ import Foundation
 
 public class XvAudioConstants {
     public static let kXvAudioPlaybackSuccess:String = "kXvAudioPlaybackSuccess"
-    public static let kXvAudioGraphRender:String = "kXvAudioGraphRender"
+    //public static let kXvAudioGraphRender:String = "kXvAudioGraphRender" //system is using a timer for rendering, not this
     
     //transport notifications from host application like AUM
     public static let kXvAudioHostPlayButtonPressed:String = "kXvAudioHostPlayButtonPressed"

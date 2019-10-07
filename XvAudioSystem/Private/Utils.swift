@@ -21,11 +21,11 @@ class Utils {
     //MARK: - NOTIFICATIONS
     class func postNotification(name:String, userInfo:[AnyHashable : Any]?){
         
-        let notification:Notification.Name = Notification.Name(rawValue: name)
         NotificationCenter.default.post(
-            name: notification,
+            name: Notification.Name(name),
             object: nil,
             userInfo: userInfo)
+        
     }
     
     //MARK: CHAR CONVERSTION

@@ -147,7 +147,8 @@ class Channel {
             if (playerUnit != nil) {
                 
                 //load file into player
-                var result:OSStatus = AudioUnitSetProperty(
+                
+                var result:OSStatus? = AudioUnitSetProperty(
                     playerUnit!,
                     kAudioUnitProperty_ScheduledFileIDs,
                     kAudioUnitScope_Global,
@@ -157,7 +158,7 @@ class Channel {
                 )
                 
                 guard result == noErr else {
-                    Utils.printErrorMessage(errorString: "AUDIO CHANNEL: Error setting audio file scheduled IDs", withStatus: result)
+                    Utils.printErrorMessage(errorString: "AUDIO CHANNEL: Error setting audio file scheduled IDs", withStatus: result!)
                     return false
                 }
                 
@@ -188,7 +189,7 @@ class Channel {
                 )
                 
                 guard result == noErr else {
-                    Utils.printErrorMessage(errorString: "AUDIO CHANNEL: Error setting file region", withStatus: result)
+                    Utils.printErrorMessage(errorString: "AUDIO CHANNEL: Error setting file region", withStatus: result!)
                     return false
                 }
                 
@@ -205,9 +206,12 @@ class Channel {
                 )
                 
                 guard result == noErr else {
-                    Utils.printErrorMessage(errorString: "AUDIO CHANNEL: Error setting file prime", withStatus: result)
+                    Utils.printErrorMessage(errorString: "AUDIO CHANNEL: Error setting file prime", withStatus: result!)
                     return false
                 }
+                
+                //release object
+                result = nil
                 
                 return true
                 
@@ -222,9 +226,6 @@ class Channel {
             print("AUDIO CHANNEL:", busNum, "Error invalid file init player")
             return false
         }
-        
-        
-        
     }
     
     /*
@@ -328,7 +329,7 @@ class Channel {
             let result:OSStatus = AudioFileOpenURL(
                 fileNsUrl,
                 AudioFilePermissions.readPermission,
-                0, //kAudioFileWAVEType
+                kAudioFileWAVEType,
                 &_audioFile)
             
             
