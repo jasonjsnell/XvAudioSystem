@@ -54,7 +54,5 @@ class Utils {
         print("  Channels per Frame:  ",    asbd.mChannelsPerFrame)
         print("  Bits per Channel:    ",    asbd.mBitsPerChannel)
         print("  Sample Rate:         ",    asbd.mSampleRate)
-        
     }
-    
 }
