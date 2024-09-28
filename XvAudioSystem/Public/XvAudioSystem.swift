@@ -7,6 +7,8 @@ public protocol XvAudioSystemDelegate: AnyObject {
 
 public class XvAudioSystem {
     public weak var delegate: XvAudioSystemDelegate?
+    
+    fileprivate let debug:Bool = false
 
     // Singleton instance
     public static let sharedInstance = XvAudioSystem()
@@ -31,7 +33,7 @@ public class XvAudioSystem {
     @discardableResult
     public func playSound(name: String, volume: Float = 1.0, pitch: Float = 0.0, pan: Float = 0.0, loop: Bool = false) -> Int {
         guard let channel = getAvailableChannel() else {
-            print("AUDIO SYS: All channels are busy.")
+            if debug { print("AUDIO SYS: All channels are busy.") }
             return -1
         }
 

@@ -76,6 +76,7 @@ class Channel {
 
         do {
             try audioFile.read(into: buffer)
+            //print("Success reading audio file \(name) into buffer:")
         } catch {
             print("Error reading audio file \(name) into buffer: \(error.localizedDescription)")
             return false
