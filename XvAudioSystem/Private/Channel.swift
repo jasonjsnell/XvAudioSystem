@@ -9,8 +9,7 @@ class Channel {
     private let pitchNode = AVAudioUnitTimePitch()
     private let mixerNode: AVAudioMixerNode
 
-    // Audio File
-    private var audioFile: AVAudioFile?
+    // channel states
     private var looping: Bool = false
     private var isPlaying:Bool = false
 
@@ -42,54 +41,79 @@ class Channel {
     }
 
     // Play sound
-    func playSound(name: String, volume: Float = 1.0, pitch: Float = 0.0, pan: Float = 0.0, loop: Bool = false) -> Bool {
+    private var currentBuffer: AVAudioPCMBuffer?
+      
+    func playSound(name: String, volume: Float = 1.0, rampTo:Float = 0.0, pitch: Float = 0.0, pan: Float = 0.0, loop: Bool = false) -> Bool {
+        
         // Stop previous playback
         stopPlayback()
+        
+        //Init new audioFile
+        var audioFile: AVAudioFile?
 
         // Load the audio file if not already loaded or if a different file is requested
         if audioFile == nil || audioFile?.url.lastPathComponent != "\(name).wav" {
             guard let url = Bundle.main.url(forResource: name, withExtension: "wav") else {
-                print("Could not find audio file \(name).wav")
+                print("Channel: Could not find audio file \(name).wav")
                 return false
             }
 
             do {
                 audioFile = try AVAudioFile(forReading: url)
             } catch {
-                print("Error loading audio file: \(name) \(error.localizedDescription)")
+                print("Channel: Error loading audio file: \(name) \(error.localizedDescription)")
                 return false
             }
         }
 
         guard let audioFile = audioFile else {
-            print("Audio file \(name) is not available.")
+            print("Channel: Audio file \(name) is not available.")
             return false
         }
+        
+        // Reset file read position
+        audioFile.framePosition = 0
 
         // Create a buffer from the audio file
         let processingFormat = audioFile.processingFormat
         let frameCount = UInt32(audioFile.length)
         guard let buffer = AVAudioPCMBuffer(pcmFormat: processingFormat, frameCapacity: frameCount) else {
-            print("Could not create PCM buffer for \(name).")
+            print("Channel: Could not create PCM buffer for \(name).")
             return false
         }
 
         do {
             try audioFile.read(into: buffer)
-            //print("Success reading audio file \(name) into buffer:")
+            //print("Channel: Success reading audio file \(name) into buffer:")
         } catch {
-            print("Error reading audio file \(name) into buffer: \(error.localizedDescription)")
+            print("Channel: Error reading audio file \(name) into buffer: \(error.localizedDescription)")
             return false
         }
+        
+        // Retain buffer
+        currentBuffer = buffer
 
         // Schedule playback with looping option
         let options: AVAudioPlayerNodeBufferOptions = loop ? [.loops] : []
-        playerNode.scheduleBuffer(buffer, at: nil, options: options) { [self] in
-            playbackComplete()
+        playerNode.scheduleBuffer(buffer, at: nil, options: options) { [weak self] in
+            self?.playbackComplete()
         }
+        
+//        print("Audio file frameLength: \(audioFile.length), framePosition: \(audioFile.framePosition)")
+//        print("Buffer capacity: \(buffer.frameCapacity), buffer length: \(buffer.frameLength)")
 
-        // Set parameters
-        mixerNode.outputVolume = volume
+
+        //volume changes either immediate or ramping to that target volume
+        if (rampTo == 0.0) {
+            mixerNode.outputVolume = volume
+        } else if (rampTo > 0.0){
+            rampToVolume(volume, duration: TimeInterval(rampTo))
+        } else if (rampTo < 0.0) {
+            //make the value positive
+            rampToVolume(volume, duration: TimeInterval(-rampTo))
+        }
+        
+        // Set pitch and pan
         pitchNode.pitch = pitch
         mixerNode.pan = pan
 
@@ -104,6 +128,9 @@ class Channel {
 
     //called from scheduleBuffer completion handler above
     func playbackComplete(){
+        //playerNode.stop()
+        //playerNode.reset()
+        currentBuffer = nil
         isPlaying = false
     }
 
@@ -111,16 +138,13 @@ class Channel {
     func stopPlayback() {
         playerNode.stop()
         playerNode.reset()
+        currentBuffer = nil
+        isPlaying = false
     }
 
     // Check if channel is playing
     func isAvailable() -> Bool {
         return !isPlaying
-    }
-
-    // Set volume
-    func setVolume(_ volume: Float) {
-        mixerNode.outputVolume = volume
     }
 
     // Set pan
@@ -132,5 +156,73 @@ class Channel {
     func setPitch(_ pitch: Float) {
         pitchNode.pitch = pitch
     }
+    
+    // Set volume
+    func setVolume(_ volume: Float) {
+        mixerNode.outputVolume = volume
+    }
+    
+    private var rampToTimer: Timer?
+
+    func rampToVolume(_ targetVolume: Float, duration: TimeInterval) {
+        // If not on the main thread, dispatch to main
+        if !Thread.isMainThread {
+            DispatchQueue.main.async {
+                self.rampToVolume(targetVolume, duration: duration)
+            }
+            return
+        }
+
+        let startVolume = mixerNode.outputVolume
+        let volumeDelta = abs(targetVolume - startVolume)
+
+        // Define a base step count and a minimum change threshold per step
+        let baseSteps = 60
+        let minChangePerStep: Float = 0.01
+
+        // Calculate how many steps are really needed
+        // For example, if volumeDelta is 0.05 and minChangePerStep is 0.01 => 5 steps
+        let neededSteps = Int(ceil(volumeDelta / minChangePerStep))
+        // Pick the smaller of baseSteps and neededSteps, ensuring at least 1 step
+        let steps = max(1, min(baseSteps, neededSteps))
+
+        // Step duration based on total desired time
+        let stepDuration = duration / Double(steps)
+        var currentStep = 0
+
+        //print("Ramp from \(startVolume) to \(targetVolume), total delta \(volumeDelta), steps \(steps), stepDuration \(stepDuration) totalTime \(Double(steps) * stepDuration)")
+
+        // Invalidate existing timer
+        rampToTimer?.invalidate()
+        rampToTimer = nil
+
+        rampToTimer = Timer.scheduledTimer(withTimeInterval: stepDuration, repeats: true) { [weak self] timer in
+            guard let self = self else { return }
+
+            currentStep += 1
+            let fraction = Float(currentStep) / Float(steps)
+            
+            // Interpolate linearly between startVolume and targetVolume
+            let newVolume: Float
+            if targetVolume >= startVolume {
+                newVolume = startVolume + (volumeDelta * fraction)
+            } else {
+                newVolume = startVolume - (volumeDelta * fraction)
+            }
+
+            self.mixerNode.outputVolume = newVolume
+            //print("Step \(currentStep): newVol \(newVolume)")
+
+            if currentStep >= steps {
+                timer.invalidate()
+                self.mixerNode.outputVolume = targetVolume
+                //print("Ramp complete at \(targetVolume)")
+            }
+        }
+
+        // Ensure the timer fires during common run loop modes (e.g. scrolling)
+        RunLoop.main.add(rampToTimer!, forMode: .common)
+    }
+
 }
 

@@ -55,4 +55,38 @@ class Utils {
         print("  Bits per Channel:    ",    asbd.mBitsPerChannel)
         print("  Sample Rate:         ",    asbd.mSampleRate)
     }
+    
+    //MARK: MUSICAL NOTATION
+    class func midiNoteNumber(from note: String) -> Int? {
+        let noteMap: [String: Int] = [
+            "C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3,
+            "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8,
+            "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11
+        ]
+        
+        var letterPart = ""
+        var octavePart = ""
+        for char in note {
+            if char.isLetter || char == "#" || char == "b" {
+                letterPart.append(char)
+            } else if char.isNumber {
+                octavePart.append(char)
+            }
+        }
+        
+        guard let semitone = noteMap[letterPart], let octave = Int(octavePart) else {
+            return nil
+        }
+        
+        return (octave + 1) * 12 + semitone
+    }
+    
+    class func pitchShiftCents(target: String, base: String = "C3") -> Float? {
+        guard let targetMidi = midiNoteNumber(from: target),
+              let baseMidi = midiNoteNumber(from: base) else {
+            return nil
+        }
+        return Float(targetMidi - baseMidi) * 100.0
+    }
+
 }

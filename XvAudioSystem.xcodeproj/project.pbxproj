@@ -10,7 +10,6 @@
 		9686074B1E6F3EEE0011E7F2 /* XvAudioSystem.h in Headers */ = {isa = PBXBuildFile; fileRef = 968607491E6F3EEE0011E7F2 /* XvAudioSystem.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		968607521E6F3F0A0011E7F2 /* XvAudioSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968607511E6F3F0A0011E7F2 /* XvAudioSystem.swift */; };
 		968607591E6F3F1A0011E7F2 /* Channel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968607541E6F3F1A0011E7F2 /* Channel.swift */; };
-		9686075A1E6F3F1A0011E7F2 /* AudioComponentDescriptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968607551E6F3F1A0011E7F2 /* AudioComponentDescriptions.swift */; };
 		9686075B1E6F3F1A0011E7F2 /* Engine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968607561E6F3F1A0011E7F2 /* Engine.swift */; };
 		9686075C1E6F3F1A0011E7F2 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968607571E6F3F1A0011E7F2 /* SessionManager.swift */; };
 		9686075D1E6F3F1A0011E7F2 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968607581E6F3F1A0011E7F2 /* Utils.swift */; };
@@ -23,7 +22,6 @@
 		9686074A1E6F3EEE0011E7F2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		968607511E6F3F0A0011E7F2 /* XvAudioSystem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = XvAudioSystem.swift; path = XvAudioSystem/Public/XvAudioSystem.swift; sourceTree = "<group>"; };
 		968607541E6F3F1A0011E7F2 /* Channel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Channel.swift; path = Private/Channel.swift; sourceTree = "<group>"; };
-		968607551E6F3F1A0011E7F2 /* AudioComponentDescriptions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = AudioComponentDescriptions.swift; path = Private/AudioComponentDescriptions.swift; sourceTree = "<group>"; };
 		968607561E6F3F1A0011E7F2 /* Engine.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Engine.swift; path = Private/Engine.swift; sourceTree = "<group>"; };
 		968607571E6F3F1A0011E7F2 /* SessionManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = SessionManager.swift; path = Private/SessionManager.swift; sourceTree = "<group>"; };
 		968607581E6F3F1A0011E7F2 /* Utils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Utils.swift; path = Private/Utils.swift; sourceTree = "<group>"; };
@@ -65,7 +63,6 @@
 				968607561E6F3F1A0011E7F2 /* Engine.swift */,
 				968607541E6F3F1A0011E7F2 /* Channel.swift */,
 				968607571E6F3F1A0011E7F2 /* SessionManager.swift */,
-				968607551E6F3F1A0011E7F2 /* AudioComponentDescriptions.swift */,
 				968607581E6F3F1A0011E7F2 /* Utils.swift */,
 				96A43AF01E7033960061A387 /* Basics */,
 				968607471E6F3EEE0011E7F2 /* Products */,
@@ -172,7 +169,6 @@
 				968607601E6F41470011E7F2 /* XvAudioConstants.swift in Sources */,
 				9686075C1E6F3F1A0011E7F2 /* SessionManager.swift in Sources */,
 				968607521E6F3F0A0011E7F2 /* XvAudioSystem.swift in Sources */,
-				9686075A1E6F3F1A0011E7F2 /* AudioComponentDescriptions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

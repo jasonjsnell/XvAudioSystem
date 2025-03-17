@@ -49,9 +49,9 @@ class Engine {
         audioEngine.attach(reverbNode)
         
         // Connect nodes in the desired order
-        audioEngine.connect(mainMixer, to: lpfNode, format: mainMixer.outputFormat(forBus: 0))
-        audioEngine.connect(lpfNode, to: delayNode, format: mainMixer.outputFormat(forBus: 0))
-        audioEngine.connect(delayNode, to: reverbNode, format: mainMixer.outputFormat(forBus: 0))
+        audioEngine.connect(mainMixer,  to: lpfNode, format: mainMixer.outputFormat(forBus: 0))
+        audioEngine.connect(lpfNode,    to: delayNode, format: mainMixer.outputFormat(forBus: 0))
+        audioEngine.connect(delayNode,  to: reverbNode, format: mainMixer.outputFormat(forBus: 0))
         audioEngine.connect(reverbNode, to: audioEngine.outputNode, format: mainMixer.outputFormat(forBus: 0))
     }
     
@@ -107,8 +107,35 @@ class Engine {
     func set(delayWetDryMix:Float) {
         delayNode.wetDryMix = delayWetDryMix * 100
     }
+    func setDelayBpm(bpm: Double, subdivision: Double = 1.0) {
+        // Ensure BPM is valid
+        guard bpm > 0 else {
+            print("Engine: Error: Invalid BPM")
+            return
+        }
+        
+        // Calculate seconds per beat
+        let secondsPerBeat = 60.0 / bpm
+        
+        // Calculate delay time based on the subdivision (e.g., quarter note, eighth note)
+        let delayTime = secondsPerBeat / subdivision
+        
+        if (delayTime > 2.0) {
+            print("Engine: Error: Delay time cannot be more than 2.0")
+            return
+        }
+        
+        // Ensure delay time is within the allowable range
+        delayNode.delayTime = delayTime
+    }
+    func set(delayFeedback:Float) {
+        delayNode.feedback = delayFeedback
+    }
     func set(reverbWetDryMix:Float) {
-        delayNode.wetDryMix = reverbWetDryMix * 100
+        reverbNode.wetDryMix = reverbWetDryMix * 100
+    }
+    func set(reverbMode:AVAudioUnitReverbPreset) {
+        reverbNode.loadFactoryPreset(reverbMode)
     }
 
 }

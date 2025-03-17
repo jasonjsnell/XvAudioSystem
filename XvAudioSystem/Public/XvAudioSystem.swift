@@ -8,7 +8,7 @@ public protocol XvAudioSystemDelegate: AnyObject {
 public class XvAudioSystem {
     public weak var delegate: XvAudioSystemDelegate?
     
-    fileprivate let debug:Bool = false
+    private let debug:Bool = false
 
     // Singleton instance
     public static let sharedInstance = XvAudioSystem()
@@ -29,15 +29,27 @@ public class XvAudioSystem {
         channels = engine.getChannels()
     }
 
+    //play sound with pitch as a String
+    public func playSound(name: String, volume: Float = 1.0, rampTo: Float = 0.0,  pitch: String = "C3", pan: Float = 0.0, loop: Bool = false) -> Int {
+        
+         var pitchCents:Float = 1.0
+         if let _pitchCents:Float = Utils.pitchShiftCents(target: pitch) {
+             pitchCents = _pitchCents
+         }
+         
+        return playSound(name: name, volume: volume, rampTo: rampTo, pitch: pitchCents, pan: pan, loop: loop)
+    }
+    
     // Play sound
+    //play sound with pitch as Float
     @discardableResult
-    public func playSound(name: String, volume: Float = 1.0, pitch: Float = 0.0, pan: Float = 0.0, loop: Bool = false) -> Int {
+    public func playSound(name: String, volume: Float = 1.0, rampTo: Float = 0.0, pitch: Float = 0.0, pan: Float = 0.0, loop: Bool = false) -> Int {
         guard let channel = getAvailableChannel() else {
             if debug { print("AUDIO SYS: All channels are busy.") }
             return -1
         }
 
-        if channel.playSound(name: name, volume: volume, pitch: pitch, pan: pan, loop: loop) {
+        if channel.playSound(name: name, volume: volume, rampTo: rampTo, pitch: pitch, pan: pan, loop: loop) {
             delegate?.soundDidPlay(name: name, volume: volume, pitch: pitch, pan: pan)
 
             return channel.id
@@ -45,6 +57,7 @@ public class XvAudioSystem {
             return -1
         }
     }
+    
 
     // Get an available channel
     private func getAvailableChannel() -> Channel? {
@@ -61,8 +74,17 @@ public class XvAudioSystem {
     public func set(reverbWetDryMix: Float) {
         engine.set(reverbWetDryMix: reverbWetDryMix)
     }
+    public func set(reverbMode:AVAudioUnitReverbPreset) {
+        engine.set(reverbMode: reverbMode)
+    }
     public func set(delayWetDryMix:Float) {
         engine.set(delayWetDryMix: delayWetDryMix)
+    }
+    public func setDelayBpm(bpm: Double, subdivision: Double = 1.0) {
+        engine.setDelayBpm(bpm: bpm, subdivision: subdivision)
+    }
+    public func set(delayFeedback:Float) {
+        engine.set(delayFeedback: delayFeedback)
     }
     public func setLowPassFilter(frequency: Float) {
         engine.setLowPassFilter(frequency: frequency)
