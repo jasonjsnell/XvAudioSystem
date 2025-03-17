@@ -16,5 +16,8 @@ public class XvAudioConstants {
     public static let kXvAudioHostPlayButtonPressed:String = "kXvAudioHostPlayButtonPressed"
     public static let kXvAudioHostPauseButtonPressed:String = "kXvAudioHostPauseButtonPressed"
     
+    public static let kXvPitchModeTimePitch:String = "kXvPitchModeTimePitch"
+    public static let kXvPitchModeVarispeed:String = "kXvPitchModeVarispeed"
+    
 }
 

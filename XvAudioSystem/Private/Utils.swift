@@ -81,12 +81,22 @@ class Utils {
         return (octave + 1) * 12 + semitone
     }
     
+    //use with AVAudioUnitTimePitch
     class func pitchShiftCents(target: String, base: String = "C3") -> Float? {
         guard let targetMidi = midiNoteNumber(from: target),
               let baseMidi = midiNoteNumber(from: base) else {
             return nil
         }
         return Float(targetMidi - baseMidi) * 100.0
+    }
+    
+    //use with AVAudioUnitVarispeed
+    class func varispeedRate(target: String, base: String = "C3") -> Float? {
+        guard let targetMidi = midiNoteNumber(from: target),
+              let baseMidi = midiNoteNumber(from: base) else {
+            return nil
+        }
+        return pow(2.0, Float(targetMidi - baseMidi) / 12.0)
     }
 
 }

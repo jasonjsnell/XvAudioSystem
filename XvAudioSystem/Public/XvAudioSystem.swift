@@ -13,7 +13,13 @@ public class XvAudioSystem {
     // Singleton instance
     public static let sharedInstance = XvAudioSystem()
     private init() {}
+    
+    //pitch mode can be TimePitch (time stretch) or Varispeed (no time stretch)
+    private var pitchMode:String = XvAudioConstants.kXvPitchModeTimePitch
 
+    //init session
+    private let sessionManager:SessionManager = SessionManager.sharedInstance
+    
     // Engine and channels
     private let engine = Engine.sharedInstance
     private var channels: [Channel] = []
@@ -21,23 +27,39 @@ public class XvAudioSystem {
     // Channel management
     private var channelTotal: Int = 1
 
-    public func setup(withChannelTotal: Int) {
+    public func setup(withChannelTotal: Int, withPitchMode:String = XvAudioConstants.kXvPitchModeTimePitch) {
+        
         channelTotal = withChannelTotal
+        pitchMode = withPitchMode
 
         // Setup the engine and channels
-        engine.setup(withChannelTotal: channelTotal)
+        engine.setup(withChannelTotal: channelTotal, withPitchMode: pitchMode)
         channels = engine.getChannels()
     }
 
     //play sound with pitch as a String
     public func playSound(name: String, volume: Float = 1.0, rampTo: Float = 0.0,  pitch: String = "C3", pan: Float = 0.0, loop: Bool = false) -> Int {
         
-         var pitchCents:Float = 1.0
-         if let _pitchCents:Float = Utils.pitchShiftCents(target: pitch) {
-             pitchCents = _pitchCents
-         }
-         
-        return playSound(name: name, volume: volume, rampTo: rampTo, pitch: pitchCents, pan: pan, loop: loop)
+        var convertedPitch:Float = 0.0
+        
+        if (pitchMode == XvAudioConstants.kXvPitchModeTimePitch){
+            
+            //time stretch uses pitch cents
+            convertedPitch = 0.0 //pitch cents default, C3
+            if let _pitchCents:Float = Utils.pitchShiftCents(target: pitch) {
+                convertedPitch = _pitchCents
+            }
+            
+        } else if (pitchMode == XvAudioConstants.kXvPitchModeVarispeed) {
+            
+            //varispeed uses rate
+            convertedPitch = 1.0 //rate default, C3
+            if let _rate:Float = Utils.varispeedRate(target: pitch) {
+                convertedPitch = _rate
+            }
+        }
+        
+        return playSound(name: name, volume: volume, rampTo: rampTo, pitch: convertedPitch, pan: pan, loop: loop)
     }
     
     // Play sound

@@ -55,11 +55,11 @@ class Engine {
         audioEngine.connect(reverbNode, to: audioEngine.outputNode, format: mainMixer.outputFormat(forBus: 0))
     }
     
-    func setup(withChannelTotal: Int) {
+    func setup(withChannelTotal: Int, withPitchMode:String = XvAudioConstants.kXvPitchModeTimePitch) {
         
         // Create channels
         for i in 0..<withChannelTotal {
-            let channel = Channel(id: i)
+            let channel = Channel(id: i, pitchMode: withPitchMode)
             channels.append(channel)
             
             // Attach channel nodes to the engine

@@ -5,18 +5,22 @@ class Channel {
     let id: Int
     
     // Nodes
-    private let playerNode = AVAudioPlayerNode()
-    private let pitchNode = AVAudioUnitTimePitch()
+    private let playerNode:AVAudioPlayerNode = AVAudioPlayerNode()
+    private let timePitchNode:AVAudioUnitTimePitch = AVAudioUnitTimePitch()
+    private let varispeedPitchNode:AVAudioUnitVarispeed = AVAudioUnitVarispeed()
     private let mixerNode: AVAudioMixerNode
+    
+    private var pitchMode:String = XvAudioConstants.kXvPitchModeTimePitch
 
     // channel states
     private var looping: Bool = false
     private var isPlaying:Bool = false
 
     // Initialization
-    init(id: Int) {
+    init(id: Int, pitchMode:String = XvAudioConstants.kXvPitchModeTimePitch) {
         
         self.id = id
+        self.pitchMode = pitchMode
         
         // Initialize the mix node for this channel
         mixerNode = AVAudioMixerNode()
@@ -26,7 +30,14 @@ class Channel {
     // Attach nodes to the engine
     func attachNodes(to engine: AVAudioEngine) {
         engine.attach(playerNode)
-        engine.attach(pitchNode)
+        
+        //what type of pitch? time stretch or no time stretch?
+        if (pitchMode == XvAudioConstants.kXvPitchModeTimePitch){
+            engine.attach(timePitchNode)
+        } else if (pitchMode == XvAudioConstants.kXvPitchModeVarispeed) {
+            engine.attach(varispeedPitchNode)
+        }
+        
         engine.attach(mixerNode)
     }
 
@@ -34,8 +45,19 @@ class Channel {
     func connectNodes(to mainMixer: AVAudioMixerNode) {
         if let engine = playerNode.engine {
             // Connect player -> pitch -> mixer
-            engine.connect(playerNode, to: pitchNode, format: nil)
-            engine.connect(pitchNode, to: mixerNode, format: nil)
+            
+            if (pitchMode == XvAudioConstants.kXvPitchModeTimePitch){
+                
+                //timestretch
+                engine.connect(playerNode, to: timePitchNode, format: nil)
+                engine.connect(timePitchNode, to: mixerNode, format: nil)
+            } else if (pitchMode == XvAudioConstants.kXvPitchModeVarispeed) {
+    
+                //no time stretch
+                engine.connect(playerNode, to: varispeedPitchNode, format: nil)
+                engine.connect(varispeedPitchNode, to: mixerNode, format: nil)
+            }
+            
             engine.connect(mixerNode, to: mainMixer, format: nil)
         }
     }
@@ -44,6 +66,8 @@ class Channel {
     private var currentBuffer: AVAudioPCMBuffer?
       
     func playSound(name: String, volume: Float = 1.0, rampTo:Float = 0.0, pitch: Float = 0.0, pan: Float = 0.0, loop: Bool = false) -> Bool {
+        
+        //print("XvAudioSystem: Channel: playSound: name", name, "volume", volume, "rampTo", rampTo, "pitch", pitch, "pan", pan, "loop", loop)
         
         // Stop previous playback
         stopPlayback()
@@ -114,7 +138,16 @@ class Channel {
         }
         
         // Set pitch and pan
-        pitchNode.pitch = pitch
+        if (pitchMode == XvAudioConstants.kXvPitchModeTimePitch){
+            
+            timePitchNode.pitch = pitch
+            
+        } else if (pitchMode == XvAudioConstants.kXvPitchModeVarispeed) {
+            
+            varispeedPitchNode.rate = pitch
+        }
+        
+        
         mixerNode.pan = pan
 
         // Start the player node if not already playing
@@ -154,7 +187,15 @@ class Channel {
 
     // Set pitch
     func setPitch(_ pitch: Float) {
-        pitchNode.pitch = pitch
+        
+        if (pitchMode == XvAudioConstants.kXvPitchModeTimePitch){
+            
+            timePitchNode.pitch = pitch
+            
+        } else if (pitchMode == XvAudioConstants.kXvPitchModeVarispeed) {
+     
+            varispeedPitchNode.rate = pitch
+        }
     }
     
     // Set volume
