@@ -10,7 +10,7 @@ class SessionManager {
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(.playback, mode: .default, options: [])
-            try session.setPreferredSampleRate(48000)
+            //try session.setPreferredSampleRate(48000)
             try session.setActive(true)
 
             print("XvAudioSystem: Session: Sample rate set:", session.sampleRate)
@@ -34,9 +34,9 @@ class SessionManager {
 
         switch type {
         case .began:
-            XvAudioSystem.sharedInstance.beginInterruption()
+            XvmAudioSystem.sharedInstance.beginInterruption()
         case .ended:
-            XvAudioSystem.sharedInstance.endInterruption()
+            XvmAudioSystem.sharedInstance.endInterruption()
         @unknown default:
             break
         }

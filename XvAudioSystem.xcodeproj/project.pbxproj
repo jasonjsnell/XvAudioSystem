@@ -3,38 +3,38 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 90;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		9686074B1E6F3EEE0011E7F2 /* XvAudioSystem.h in Headers */ = {isa = PBXBuildFile; fileRef = 968607491E6F3EEE0011E7F2 /* XvAudioSystem.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		968607521E6F3F0A0011E7F2 /* XvAudioSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968607511E6F3F0A0011E7F2 /* XvAudioSystem.swift */; };
+		968607521E6F3F0A0011E7F2 /* XvmAudioSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968607511E6F3F0A0011E7F2 /* XvmAudioSystem.swift */; };
 		968607591E6F3F1A0011E7F2 /* Channel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968607541E6F3F1A0011E7F2 /* Channel.swift */; };
 		9686075B1E6F3F1A0011E7F2 /* Engine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968607561E6F3F1A0011E7F2 /* Engine.swift */; };
 		9686075C1E6F3F1A0011E7F2 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968607571E6F3F1A0011E7F2 /* SessionManager.swift */; };
 		9686075D1E6F3F1A0011E7F2 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968607581E6F3F1A0011E7F2 /* Utils.swift */; };
 		968607601E6F41470011E7F2 /* XvAudioConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9686075F1E6F41470011E7F2 /* XvAudioConstants.swift */; };
+		BB6756B92D98C4010081DB6B /* FFTProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB6756B82D98C3FC0081DB6B /* FFTProcessor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		968607461E6F3EEE0011E7F2 /* XvAudioSystem.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = XvAudioSystem.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		968607491E6F3EEE0011E7F2 /* XvAudioSystem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = XvAudioSystem.h; sourceTree = "<group>"; };
 		9686074A1E6F3EEE0011E7F2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		968607511E6F3F0A0011E7F2 /* XvAudioSystem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = XvAudioSystem.swift; path = XvAudioSystem/Public/XvAudioSystem.swift; sourceTree = "<group>"; };
+		968607511E6F3F0A0011E7F2 /* XvmAudioSystem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = XvmAudioSystem.swift; path = XvAudioSystem/Public/XvmAudioSystem.swift; sourceTree = "<group>"; };
 		968607541E6F3F1A0011E7F2 /* Channel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Channel.swift; path = Private/Channel.swift; sourceTree = "<group>"; };
 		968607561E6F3F1A0011E7F2 /* Engine.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Engine.swift; path = Private/Engine.swift; sourceTree = "<group>"; };
 		968607571E6F3F1A0011E7F2 /* SessionManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = SessionManager.swift; path = Private/SessionManager.swift; sourceTree = "<group>"; };
 		968607581E6F3F1A0011E7F2 /* Utils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Utils.swift; path = Private/Utils.swift; sourceTree = "<group>"; };
 		9686075F1E6F41470011E7F2 /* XvAudioConstants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = XvAudioConstants.swift; path = XvAudioSystem/Public/XvAudioConstants.swift; sourceTree = "<group>"; };
+		BB6756B82D98C3FC0081DB6B /* FFTProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFTProcessor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		968607421E6F3EEE0011E7F2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -42,7 +42,7 @@
 		9686073C1E6F3EEE0011E7F2 = {
 			isa = PBXGroup;
 			children = (
-				968607511E6F3F0A0011E7F2 /* XvAudioSystem.swift */,
+				968607511E6F3F0A0011E7F2 /* XvmAudioSystem.swift */,
 				9686075F1E6F41470011E7F2 /* XvAudioConstants.swift */,
 				9686075E1E6F3F220011E7F2 /* Private */,
 			);
@@ -63,6 +63,7 @@
 				968607561E6F3F1A0011E7F2 /* Engine.swift */,
 				968607541E6F3F1A0011E7F2 /* Channel.swift */,
 				968607571E6F3F1A0011E7F2 /* SessionManager.swift */,
+				BB6756B82D98C3FC0081DB6B /* FFTProcessor.swift */,
 				968607581E6F3F1A0011E7F2 /* Utils.swift */,
 				96A43AF01E7033960061A387 /* Basics */,
 				968607471E6F3EEE0011E7F2 /* Products */,
@@ -85,11 +86,9 @@
 /* Begin PBXHeadersBuildPhase section */
 		968607431E6F3EEE0011E7F2 /* Headers */ = {
 			isa = PBXHeadersBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				9686074B1E6F3EEE0011E7F2 /* XvAudioSystem.h in Headers */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXHeadersBuildPhase section */
 
@@ -105,8 +104,6 @@
 			);
 			buildRules = (
 			);
-			dependencies = (
-			);
 			name = XvAudioSystem;
 			productName = XvAudioSystem;
 			productReference = 968607461E6F3EEE0011E7F2 /* XvAudioSystem.framework */;
@@ -119,7 +116,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1600;
+				LastUpgradeCheck = 2600;
 				ORGANIZATIONNAME = "Jason J. Snell";
 				TargetAttributes = {
 					968607451E6F3EEE0011E7F2 = {
@@ -131,7 +128,6 @@
 				};
 			};
 			buildConfigurationList = 968607401E6F3EEE0011E7F2 /* Build configuration list for PBXProject "XvAudioSystem" */;
-			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -139,6 +135,7 @@
 				Base,
 			);
 			mainGroup = 9686073C1E6F3EEE0011E7F2;
+			preferredProjectObjectVersion = 90;
 			productRefGroup = 968607471E6F3EEE0011E7F2 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -151,31 +148,28 @@
 /* Begin PBXResourcesBuildPhase section */
 		968607441E6F3EEE0011E7F2 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		968607411E6F3EEE0011E7F2 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				9686075B1E6F3F1A0011E7F2 /* Engine.swift in Sources */,
 				968607591E6F3F1A0011E7F2 /* Channel.swift in Sources */,
 				9686075D1E6F3F1A0011E7F2 /* Utils.swift in Sources */,
 				968607601E6F41470011E7F2 /* XvAudioConstants.swift in Sources */,
 				9686075C1E6F3F1A0011E7F2 /* SessionManager.swift in Sources */,
-				968607521E6F3F0A0011E7F2 /* XvAudioSystem.swift in Sources */,
+				BB6756B92D98C4010081DB6B /* FFTProcessor.swift in Sources */,
+				968607521E6F3F0A0011E7F2 /* XvmAudioSystem.swift in Sources */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		9686074C1E6F3EEE0011E7F2 /* Debug */ = {
+		9686074C1E6F3EEE0011E7F2 /* Debug configuration for PBXProject "XvAudioSystem" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -211,6 +205,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = LN2HJCURK9;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -233,6 +228,7 @@
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 4.2;
@@ -243,7 +239,7 @@
 			};
 			name = Debug;
 		};
-		9686074D1E6F3EEE0011E7F2 /* Release */ = {
+		9686074D1E6F3EEE0011E7F2 /* Release configuration for PBXProject "XvAudioSystem" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -279,6 +275,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = LN2HJCURK9;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -295,6 +292,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				ONLY_ACTIVE_ARCH = NO;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 4.2;
@@ -306,25 +304,26 @@
 			};
 			name = Release;
 		};
-		9686074F1E6F3EEE0011E7F2 /* Debug */ = {
+		9686074F1E6F3EEE0011E7F2 /* Debug configuration for PBXNativeTarget "XvAudioSystem" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "";
 				DEFINES_MODULE = YES;
-				DEVELOPMENT_TEAM = LN2HJCURK9;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				ENABLE_MODULE_VERIFIER = YES;
 				INFOPLIST_FILE = XvAudioSystem/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu99 gnu++11";
 				PRODUCT_BUNDLE_IDENTIFIER = com.jasonjsnell.XvAudioSystem;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -339,25 +338,26 @@
 			};
 			name = Debug;
 		};
-		968607501E6F3EEE0011E7F2 /* Release */ = {
+		968607501E6F3EEE0011E7F2 /* Release configuration for PBXNativeTarget "XvAudioSystem" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "";
 				DEFINES_MODULE = YES;
-				DEVELOPMENT_TEAM = LN2HJCURK9;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				ENABLE_MODULE_VERIFIER = YES;
 				INFOPLIST_FILE = XvAudioSystem/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu99 gnu++11";
 				PRODUCT_BUNDLE_IDENTIFIER = com.jasonjsnell.XvAudioSystem;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -377,19 +377,17 @@
 		968607401E6F3EEE0011E7F2 /* Build configuration list for PBXProject "XvAudioSystem" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				9686074C1E6F3EEE0011E7F2 /* Debug */,
-				9686074D1E6F3EEE0011E7F2 /* Release */,
+				9686074C1E6F3EEE0011E7F2 /* Debug configuration for PBXProject "XvAudioSystem" */,
+				9686074D1E6F3EEE0011E7F2 /* Release configuration for PBXProject "XvAudioSystem" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		9686074E1E6F3EEE0011E7F2 /* Build configuration list for PBXNativeTarget "XvAudioSystem" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				9686074F1E6F3EEE0011E7F2 /* Debug */,
-				968607501E6F3EEE0011E7F2 /* Release */,
+				9686074F1E6F3EEE0011E7F2 /* Debug configuration for PBXNativeTarget "XvAudioSystem" */,
+				968607501E6F3EEE0011E7F2 /* Release configuration for PBXNativeTarget "XvAudioSystem" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */

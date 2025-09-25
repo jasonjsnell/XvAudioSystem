@@ -2,16 +2,18 @@ import Foundation
 import AVFoundation
 
 public protocol XvAudioSystemDelegate: AnyObject {
-    func soundDidPlay(name: String, volume: Float, pitch: Float, pan: Float)
+    func soundDidPlay(name: String, volume: Float, pitch: Float, pan: Float, filterCutoff:Float)
+    func fftDidUpdate(withDecibelArray:[Float])
 }
 
-public class XvAudioSystem {
+public class XvmAudioSystem: EngineDelegate {
+    
     public weak var delegate: XvAudioSystemDelegate?
     
     private let debug:Bool = false
 
     // Singleton instance
-    public static let sharedInstance = XvAudioSystem()
+    public static let sharedInstance = XvmAudioSystem()
     private init() {}
     
     //pitch mode can be TimePitch (time stretch) or Varispeed (no time stretch)
@@ -27,18 +29,44 @@ public class XvAudioSystem {
     // Channel management
     private var channelTotal: Int = 1
 
-    public func setup(withChannelTotal: Int, withPitchMode:String = XvAudioConstants.kXvPitchModeTimePitch) {
+    public func setup(
+        withChannelTotal: Int,
+        withPitchMode:String = XvAudioConstants.kXvPitchModeTimePitch,
+        enableFFT:Bool = false
+    ) -> AudioUnit? {
         
         channelTotal = withChannelTotal
         pitchMode = withPitchMode
 
         // Setup the engine and channels
-        engine.setup(withChannelTotal: channelTotal, withPitchMode: pitchMode)
-        channels = engine.getChannels()
+        if let remoteIOUnitForAudioBus:AudioUnit = engine.setup(withChannelTotal: channelTotal, withPitchMode: pitchMode, enableFFT: enableFFT) {
+            
+            if (enableFFT){
+                engine.delegate = self
+            }
+            channels = engine.getChannels()
+            
+            return remoteIOUnitForAudioBus
+            
+        } else {
+            print("XvAudioSystem: Error: Unable to get remoteIOUnitForAudioBus")
+            return nil
+        }
+    }
+    
+    public func isChannelAvailable() -> Bool {
+        return channels.first { $0.isAvailable() } != nil
     }
 
     //play sound with pitch as a String
-    public func playSound(name: String, volume: Float = 1.0, rampTo: Float = 0.0,  pitch: String = "C3", pan: Float = 0.0, loop: Bool = false) -> Int {
+    public func playSound(
+        name: String,
+        volume: Float = 1.0,
+        pitch: String = "C3",
+        pan: Float = 0.0,
+        loop: Bool = false,
+        filterCutoff: Float = 20000
+    ) -> Int {
         
         var convertedPitch:Float = 0.0
         
@@ -59,21 +87,34 @@ public class XvAudioSystem {
             }
         }
         
-        return playSound(name: name, volume: volume, rampTo: rampTo, pitch: convertedPitch, pan: pan, loop: loop)
+        return playSound(name: name, volume: volume, pitch: convertedPitch, pan: pan, loop: loop, filterCutoff: filterCutoff)
     }
     
     // Play sound
     //play sound with pitch as Float
     @discardableResult
-    public func playSound(name: String, volume: Float = 1.0, rampTo: Float = 0.0, pitch: Float = 0.0, pan: Float = 0.0, loop: Bool = false) -> Int {
+    
+    public func playSound(
+        name: String,
+        volume: Float = 1.0,
+        pitch: Float = 0.0,
+        pan: Float = 0.0,
+        loop: Bool = false,
+        filterCutoff: Float = 20000
+    ) -> Int {
+        
         guard let channel = getAvailableChannel() else {
             if debug { print("AUDIO SYS: All channels are busy.") }
             return -1
         }
+        
+        //make sure engine is running before calling the channel to play
+        if !engine.isRunning() {
+            engine.startEngine()
+        }
 
-        if channel.playSound(name: name, volume: volume, rampTo: rampTo, pitch: pitch, pan: pan, loop: loop) {
-            delegate?.soundDidPlay(name: name, volume: volume, pitch: pitch, pan: pan)
-
+        if channel.playSound(name: name, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff) {
+            delegate?.soundDidPlay(name: name, volume: volume, pitch: pitch, pan: pan, filterCutoff: filterCutoff)
             return channel.id
         } else {
             return -1
@@ -121,6 +162,10 @@ public class XvAudioSystem {
         engine.startEngine()
     }
 
+    //callback from Engine FFT
+    public func fftDidUpdate(withDecibelArray: [Float]) {
+        delegate?.fftDidUpdate(withDecibelArray: withDecibelArray)
+    }
     // Shutdown
     public func shutdown() {
         // Fade out and stop channels
@@ -129,6 +174,29 @@ public class XvAudioSystem {
             channel.stopPlayback()
         }
         engine.stopEngine()
+    }
+    
+    //status debug
+    public func getPercentageOfBusyChannels() -> Int {
+        let total = channels.count
+        guard total > 0 else { return 0 }
+        let busy = channels.filter { !$0.isAvailable() }.count
+        let percentage = (Double(busy) / Double(total)) * 100.0
+        return Int(percentage.rounded())
+    }
+    
+    public func outputStatus(){
+        let engineState = engine.isRunning() ? "running" : "stopped"
+        let total = channels.count
+        let free = channels.filter { $0.isAvailable() }
+        let active = channels.filter { !$0.isAvailable() }
+
+        let activeIDs = active.map { String($0.id) }.joined(separator: ", ")
+        let freeIDs = free.map { String($0.id) }.joined(separator: ", ")
+
+        print("[AUDIO SYS] engine=\(engineState) | pitchMode=\(pitchMode) | channels total=\(total) | active=\(active.count) | free=\(free.count)")
+        print("[AUDIO SYS] active IDs: \(activeIDs.isEmpty ? "none" : activeIDs)")
+        print("[AUDIO SYS] free IDs: \(freeIDs.isEmpty ? "none" : freeIDs)")
     }
 }
 

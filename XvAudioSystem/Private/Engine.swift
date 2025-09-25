@@ -1,6 +1,14 @@
 import AVFoundation
+import Accelerate
+
+public protocol EngineDelegate: AnyObject {
+    func fftDidUpdate(withDecibelArray:[Float])
+}
 
 class Engine {
+    
+    public weak var delegate: EngineDelegate?
+    
     // Singleton instance
     static let sharedInstance = Engine()
     
@@ -15,6 +23,10 @@ class Engine {
     
     // Channels
     private var channels: [Channel] = []
+    
+    //FFT
+    private var enableFFT: Bool = false
+    private var fftProcessor: FFTProcessor? = nil
     
     private init() {
         
@@ -55,7 +67,16 @@ class Engine {
         audioEngine.connect(reverbNode, to: audioEngine.outputNode, format: mainMixer.outputFormat(forBus: 0))
     }
     
-    func setup(withChannelTotal: Int, withPitchMode:String = XvAudioConstants.kXvPitchModeTimePitch) {
+    func setup(
+        withChannelTotal: Int,
+        withPitchMode:String = XvAudioConstants.kXvPitchModeTimePitch,
+        enableFFT:Bool = false
+    ) -> AudioUnit? {
+        
+        // Set up FFT processor if needed
+        if enableFFT {
+            setupFFT()
+        }
         
         // Create channels
         for i in 0..<withChannelTotal {
@@ -75,10 +96,17 @@ class Engine {
         } catch {
             print("Error starting audio engine: \(error.localizedDescription)")
         }
+        
+        return audioEngine.outputNode.audioUnit
     }
+   
     
     func getChannels() -> [Channel] {
         return channels
+    }
+    
+    func isRunning() -> Bool {
+        return audioEngine.isRunning
     }
     
     func startEngine() {
@@ -97,7 +125,7 @@ class Engine {
         }
     }
     
-    //MARK: FX
+    //MARK: - FX
     func setLowPassFilter(frequency: Float) {
         if let filterParams = lpfNode.bands.first {
             filterParams.frequency = frequency
@@ -136,6 +164,41 @@ class Engine {
     }
     func set(reverbMode:AVAudioUnitReverbPreset) {
         reverbNode.loadFactoryPreset(reverbMode)
+    }
+    
+    //MARK: - FFT
+    private func setupFFT() {
+        let bufferSize: AVAudioFrameCount = 1024
+        fftProcessor = FFTProcessor(bufferSize: Int(bufferSize))
+        
+        mainMixer.installTap(onBus: 0, bufferSize: bufferSize, format: mainMixer.outputFormat(forBus: 0)) { [weak self] buffer, _ in
+            guard let self = self, let fft = self.fftProcessor else { return }
+
+            // Step 1: Get magnitudes (power spectrum)
+            let magnitudes = fft.performFFT(buffer: buffer)
+
+            // Step 2: Convert to dB
+            var dbValues = [Float](repeating: 0.0, count: magnitudes.count)
+            var zeroRef: Float = 1.0 // Reference value, usually 1.0
+            vDSP_vdbcon(magnitudes, 1, &zeroRef, &dbValues, 1, vDSP_Length(magnitudes.count), 0) // 0 = power
+
+            // Step 3 (optional): Clamp to visible range
+            let minDb: Float = -80
+            let maxDb: Float = 0
+            let clampedDb = dbValues.map { max(min($0, maxDb), minDb) }
+
+            //let avgDb = clampedDb.prefix(10).reduce(0, +) / Float(clampedDb.prefix(10).count)
+            //print("FFT dB Avg (first 10 bins):", avgDb, "Count:", clampedDb.count)
+            
+            //send to parent
+            delegate?.fftDidUpdate(withDecibelArray: clampedDb)
+        }
+    }
+
+    
+    func disableFFT() {
+        mainMixer.removeTap(onBus: 0)
+        fftProcessor = nil
     }
 
 }
