@@ -29,17 +29,32 @@ public class XvmAudioSystem: EngineDelegate {
     // Channel management
     private var channelTotal: Int = 1
 
+    //unchanged: the graph as it has always been, every channel through the effects
     public func setup(
         withChannelTotal: Int,
         withPitchMode:String = XvAudioConstants.kXvPitchModeTimePitch,
         enableFFT:Bool = false
+    ) -> AudioUnit? {
+        return setup(withChannelTotal: withChannelTotal, withPitchMode: withPitchMode, enableFFT: enableFFT, enableDryBus: false)
+    }
+
+    /* SEND AND RETURN (29 Sep 2026, opt-in). With enableDryBus, every channel feeds both
+     the effects (low-pass, delay, reverb) and a dry bus that skips them, at levels set per
+     sound (the wet/dry playSound, or set(wet:dry:forChannel:)). Sounds played with the
+     ordinary playSound are fully wet and not dry, which sounds exactly as without it.
+     Existing projects that call the setup above are unaffected. */
+    public func setup(
+        withChannelTotal: Int,
+        withPitchMode:String = XvAudioConstants.kXvPitchModeTimePitch,
+        enableFFT:Bool = false,
+        enableDryBus:Bool
     ) -> AudioUnit? {
         
         channelTotal = withChannelTotal
         pitchMode = withPitchMode
 
         // Setup the engine and channels
-        if let remoteIOUnitForAudioBus:AudioUnit = engine.setup(withChannelTotal: channelTotal, withPitchMode: pitchMode, enableFFT: enableFFT) {
+        if let remoteIOUnitForAudioBus:AudioUnit = engine.setup(withChannelTotal: channelTotal, withPitchMode: pitchMode, enableFFT: enableFFT, enableDryBus: enableDryBus) {
             
             if (enableFFT){
                 engine.delegate = self
@@ -102,6 +117,24 @@ public class XvmAudioSystem: EngineDelegate {
         loop: Bool = false,
         filterCutoff: Float = 20000
     ) -> Int {
+        //fully through the effects, as always
+        return playSound(name: name, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff, wet: 1.0, dry: 0.0)
+    }
+
+    /* The same, choosing how much goes through the effects (wet) and around them (dry),
+     each 0 to 1. Needs the dry bus (setup with enableDryBus: true); without it the sound
+     goes through the effects whatever wet and dry say. */
+    @discardableResult
+    public func playSound(
+        name: String,
+        volume: Float = 1.0,
+        pitch: Float = 0.0,
+        pan: Float = 0.0,
+        loop: Bool = false,
+        filterCutoff: Float = 20000,
+        wet: Float,
+        dry: Float
+    ) -> Int {
         
         guard let channel = getAvailableChannel() else {
             if debug { print("AUDIO SYS: All channels are busy.") }
@@ -112,6 +145,9 @@ public class XvmAudioSystem: EngineDelegate {
         if !engine.isRunning() {
             engine.startEngine()
         }
+
+        //channels are reused, so every sound sets its sends
+        if engine.hasDryBus { channel.setSends(wet: wet, dry: dry) }
 
         if channel.playSound(name: name, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff) {
             delegate?.soundDidPlay(name: name, volume: volume, pitch: pitch, pan: pan, filterCutoff: filterCutoff)
@@ -125,6 +161,21 @@ public class XvmAudioSystem: EngineDelegate {
     // Get an available channel
     private func getAvailableChannel() -> Channel? {
         return channels.first { $0.isAvailable() }
+    }
+
+    /* Frees one channel, by the id playSound returned (added 29 Sep 2026, additive: no
+     existing call changes). Meant for a channel that has already been faded to silence
+     with set(volume:forChannel:), such as a loop that has faded out, so the channel can be
+     reused. Calling it on a sounding channel cuts it off. */
+    public func stop(channel index: Int) {
+        guard index >= 0 && index < channels.count else { return }
+        channels[index].stopPlayback()
+    }
+
+    ///A sounding channel's sends, each 0 to 1 (dry bus only).
+    public func set(wet: Float, dry: Float, forChannel index: Int) {
+        guard engine.hasDryBus, index >= 0 && index < channels.count else { return }
+        channels[index].setSends(wet: wet, dry: dry)
     }
 
     // Set volume for a channel

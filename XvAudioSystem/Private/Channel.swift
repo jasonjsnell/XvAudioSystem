@@ -54,8 +54,12 @@ class Channel {
         engine.attach(mixerNode)
     }
 
+    //the two destinations when the engine has a dry bus (nil without one)
+    private var wetDestination: (mixer: AVAudioMixerNode, bus: AVAudioNodeBus)?
+    private var dryDestination: (mixer: AVAudioMixerNode, bus: AVAudioNodeBus)?
+
     // Connect nodes
-    func connectNodes(to mainMixer: AVAudioMixerNode) {
+    func connectNodes(to mainMixer: AVAudioMixerNode, dryMixer: AVAudioMixerNode? = nil) {
         if let engine = playerNode.engine {
             // Connect nodes in the order: player -> pitch -> EQ -> mixer
             if (pitchMode == XvAudioConstants.kXvPitchModeTimePitch){
@@ -67,7 +71,32 @@ class Channel {
             }
             
             engine.connect(eqNode, to: mixerNode, format: nil) // Connect EQ to Mixer
-            engine.connect(mixerNode, to: mainMixer, format: nil)
+
+            if let dryMixer {
+                //one output to both buses; each connection has its own level (setSends)
+                let wetBus = mainMixer.nextAvailableInputBus
+                let dryBus = dryMixer.nextAvailableInputBus
+                engine.connect(mixerNode, to: [
+                    AVAudioConnectionPoint(node: mainMixer, bus: wetBus),
+                    AVAudioConnectionPoint(node: dryMixer, bus: dryBus)
+                ], fromBus: 0, format: nil)
+                wetDestination = (mainMixer, wetBus)
+                dryDestination = (dryMixer, dryBus)
+                setSends(wet: 1.0, dry: 0.0) //the default: exactly as without a dry bus
+            } else {
+                engine.connect(mixerNode, to: mainMixer, format: nil)
+            }
+        }
+    }
+
+    /* How much of this channel goes through the effects (wet) and around them (dry), each
+     0 to 1. Only with a dry bus; without one the channel always goes through the effects. */
+    func setSends(wet: Float, dry: Float) {
+        if let wetDestination {
+            mixerNode.destination(forMixer: wetDestination.mixer, bus: wetDestination.bus)?.volume = max(0, min(1, wet))
+        }
+        if let dryDestination {
+            mixerNode.destination(forMixer: dryDestination.mixer, bus: dryDestination.bus)?.volume = max(0, min(1, dry))
         }
     }
 

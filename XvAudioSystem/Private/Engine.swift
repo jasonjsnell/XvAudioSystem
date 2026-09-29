@@ -23,6 +23,15 @@ class Engine {
     
     // Channels
     private var channels: [Channel] = []
+
+    /* DRY BUS (29 Sep 2026, opt-in, see XvmAudioSystem.setup(...enableDryBus:)). Only
+     built when asked for; without it the graph is exactly as before. With it, every
+     channel feeds two places at once: the main mixer (then the master low-pass, delay and
+     reverb) and this dry mixer, which skips the effects. Both meet again in the output
+     mixer. Each channel sets how much it sends to each (Channel.setSends). */
+    private var dryMixer: AVAudioMixerNode?
+    private var outputMixer: AVAudioMixerNode?
+    private(set) var hasDryBus = false
     
     //FFT
     private var enableFFT: Bool = false
@@ -70,12 +79,29 @@ class Engine {
     func setup(
         withChannelTotal: Int,
         withPitchMode:String = XvAudioConstants.kXvPitchModeTimePitch,
-        enableFFT:Bool = false
+        enableFFT:Bool = false,
+        enableDryBus:Bool = false
     ) -> AudioUnit? {
         
         // Set up FFT processor if needed
         if enableFFT {
             setupFFT()
+        }
+
+        //the dry bus, only when asked for: reverb and dry mixer meet in an output mixer
+        if enableDryBus {
+            let dry = AVAudioMixerNode()
+            let output = AVAudioMixerNode()
+            audioEngine.attach(dry)
+            audioEngine.attach(output)
+            let format = mainMixer.outputFormat(forBus: 0)
+            audioEngine.disconnectNodeOutput(reverbNode)
+            audioEngine.connect(reverbNode, to: output, fromBus: 0, toBus: 0, format: format)
+            audioEngine.connect(dry, to: output, fromBus: 0, toBus: 1, format: format)
+            audioEngine.connect(output, to: audioEngine.outputNode, format: format)
+            dryMixer = dry
+            outputMixer = output
+            hasDryBus = true
         }
         
         // Create channels
@@ -86,8 +112,8 @@ class Engine {
             // Attach channel nodes to the engine
             channel.attachNodes(to: audioEngine)
             
-            // Connect channel nodes
-            channel.connectNodes(to: mainMixer)
+            // Connect channel nodes (to both buses when there is a dry bus)
+            channel.connectNodes(to: mainMixer, dryMixer: dryMixer)
         }
         
         // Start the audio engine
