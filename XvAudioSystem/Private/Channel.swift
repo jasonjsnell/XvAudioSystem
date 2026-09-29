@@ -16,7 +16,20 @@ class Channel {
 
     // channel states
     private var looping: Bool = false
-    private var isPlaying:Bool = false
+
+    /* THREADS (29 Sep 2026). A channel is asked to play on the caller's thread, starts on
+     the schedule queue, and is marked finished on the audio thread. The state those three
+     share (busy, the buffer, which sound is current) is behind stateLock. playID counts the
+     sounds on this channel, so a late completion or a delayed start from an earlier sound
+     can never mark the current one finished, or start it twice. */
+    private let stateLock = NSLock()
+    private var isPlaying: Bool = false
+    private var playID: Int = 0
+
+    /* Where a sound actually starts, a moment after it is asked for (so volume, pan, pitch
+     and filter are in place first). Its own serial queue, shared by all channels: it was
+     the main thread, where a busy screen could make sounds start late. */
+    private static let scheduleQueue = DispatchQueue(label: "XvAudioSystem.Channel.schedule", qos: .userInteractive)
 
     // Initialization
     init(id: Int, pitchMode:String = XvAudioConstants.kXvPitchModeTimePitch) {
@@ -157,8 +170,13 @@ class Channel {
             return false
         }
         
-        // Retain buffer
+        // Retain buffer, and make this the current sound
+        stateLock.lock()
+        playID += 1
+        let thisPlay = playID
         currentBuffer = buffer
+        isPlaying = true
+        stateLock.unlock()
         
         //mixer settings
         mixerNode.outputVolume = volume
@@ -179,28 +197,34 @@ class Channel {
 
         // Schedule playback with looping option
         //slight delay to give channel time to apply incoming pan, volume, filter, etc
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let self = self, let buffer = self.currentBuffer else { return }
+        Channel.scheduleQueue.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self = self else { return }
+
+            //still the current sound? (it may have been stopped or replaced meanwhile)
+            self.stateLock.lock()
+            let buffer = self.playID == thisPlay ? self.currentBuffer : nil
+            self.stateLock.unlock()
+            guard let buffer else { return }
 
             let options: AVAudioPlayerNodeBufferOptions = loop ? [.loops] : []
-            self.playerNode.scheduleBuffer(buffer, at: nil, options: options) {
-                self.playbackComplete()
+            self.playerNode.scheduleBuffer(buffer, at: nil, options: options) { [weak self] in
+                self?.playbackComplete(playID: thisPlay)
             }
 
             if !self.playerNode.isPlaying {
                 self.playerNode.play()
-                self.isPlaying = true
             }
         }
-        self.isPlaying = true
 
         return true
     }
 
-    //called from scheduleBuffer completion handler above
-    func playbackComplete(){
-        //playerNode.stop()
-        //playerNode.reset()
+    //called from scheduleBuffer's completion handler above, on the audio thread
+    func playbackComplete(playID finished: Int) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        //a sound that has since been replaced or stopped does not free the channel
+        guard finished == playID else { return }
         currentBuffer = nil
         isPlaying = false
     }
@@ -209,12 +233,17 @@ class Channel {
     func stopPlayback() {
         playerNode.stop()
         playerNode.reset()
+        stateLock.lock()
+        playID += 1 //any pending start or completion of the stopped sound no longer counts
         currentBuffer = nil
         isPlaying = false
+        stateLock.unlock()
     }
 
     // Check if channel is playing
     func isAvailable() -> Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
         return !isPlaying
     }
 
