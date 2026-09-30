@@ -32,6 +32,13 @@ class Engine {
     private var dryMixer: AVAudioMixerNode?
     private var outputMixer: AVAudioMixerNode?
     private(set) var hasDryBus = false
+
+    /* REVERB RETURN HIGH-PASS (30 Sep 2026, dry bus only). Sits after the reverb, on the
+     return, so the reverb's low end does not muddy the mix. Two 12 dB/octave high-pass
+     bands at the same frequency: 24 dB/octave. Bypassed until a frequency is set, so
+     turning the dry bus on does not change the sound by itself. Not available without the
+     dry bus: there the reverb carries the dry signal too, and this would thin everything. */
+    private var reverbHighPass: AVAudioUnitEQ?
     
     //FFT
     private var enableFFT: Bool = false
@@ -95,8 +102,17 @@ class Engine {
             audioEngine.attach(dry)
             audioEngine.attach(output)
             let format = mainMixer.outputFormat(forBus: 0)
+            let highPass = AVAudioUnitEQ(numberOfBands: 2)
+            for band in highPass.bands {
+                band.filterType = .highPass
+                band.frequency = 20
+                band.bypass = true
+            }
+            audioEngine.attach(highPass)
             audioEngine.disconnectNodeOutput(reverbNode)
-            audioEngine.connect(reverbNode, to: output, fromBus: 0, toBus: 0, format: format)
+            audioEngine.connect(reverbNode, to: highPass, format: format)
+            audioEngine.connect(highPass, to: output, fromBus: 0, toBus: 0, format: format)
+            reverbHighPass = highPass
             audioEngine.connect(dry, to: output, fromBus: 0, toBus: 1, format: format)
             audioEngine.connect(output, to: audioEngine.outputNode, format: format)
             dryMixer = dry
@@ -190,6 +206,25 @@ class Engine {
     }
     func set(reverbMode:AVAudioUnitReverbPreset) {
         reverbNode.loadFactoryPreset(reverbMode)
+    }
+
+    ///The reverb return's high-pass, 24 dB/octave (dry bus only). nil or 0 bypasses it.
+    func setReverbHighPass(frequency: Float?) {
+        guard let highPass = reverbHighPass else { return }
+        for band in highPass.bands {
+            if let frequency, frequency > 0 {
+                band.frequency = frequency
+                band.bypass = false
+            } else {
+                band.bypass = true
+            }
+        }
+    }
+
+    /* The reverb unit's own parameters (Apple's Reverb2), beyond the preset and the mix.
+     Loading a preset sets all of them, so set these AFTER choosing a preset. */
+    func setReverbParameter(_ parameter: AudioUnitParameterID, value: Float) {
+        AudioUnitSetParameter(reverbNode.audioUnit, parameter, kAudioUnitScope_Global, 0, value, 0)
     }
     
     //MARK: - FFT

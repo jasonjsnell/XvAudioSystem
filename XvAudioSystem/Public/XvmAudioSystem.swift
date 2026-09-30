@@ -1,4 +1,5 @@
 import Foundation
+import AudioToolbox
 import AVFoundation
 
 public protocol XvAudioSystemDelegate: AnyObject {
@@ -178,6 +179,14 @@ public class XvmAudioSystem: EngineDelegate {
         channels[index].setSends(wet: wet, dry: dry)
     }
 
+    /* A sounding channel's own low-pass filter, in Hz (20000 is open). Every channel has
+     one; playSound sets it as a sound starts, and this moves it while the sound plays, e.g.
+     to darken a long drone. Added 30 Sep 2026, additive. */
+    public func set(filterCutoff: Float, forChannel index: Int) {
+        guard index >= 0 && index < channels.count else { return }
+        channels[index].setLowPassFilter(frequency: filterCutoff)
+    }
+
     // Set volume for a channel
     public func set(volume: Float, forChannel index: Int) {
         guard index >= 0 && index < channels.count else { return }
@@ -191,6 +200,38 @@ public class XvmAudioSystem: EngineDelegate {
     public func set(reverbMode:AVAudioUnitReverbPreset) {
         engine.set(reverbMode: reverbMode)
     }
+    /* THE REVERB'S FINER CONTROLS (30 Sep 2026, additive). A preset (set(reverbMode:)) sets
+     all of these, so call them after choosing the preset. */
+
+    ///How long low frequencies ring, in seconds (0.001 to 20).
+    public func set(reverbDecayLowSeconds: Float) {
+        engine.setReverbParameter(kReverb2Param_DecayTimeAt0Hz, value: min(max(reverbDecayLowSeconds, 0.001), 20))
+    }
+    ///How long high frequencies ring, in seconds (0.001 to 20). Shorter than the low decay sounds darker.
+    public func set(reverbDecayHighSeconds: Float) {
+        engine.setReverbParameter(kReverb2Param_DecayTimeAtNyquist, value: min(max(reverbDecayHighSeconds, 0.001), 20))
+    }
+    ///The shortest and longest early reflection delays, in seconds (0.0001 to 1): the size of the space.
+    public func set(reverbMinDelaySeconds: Float, maxDelaySeconds: Float) {
+        engine.setReverbParameter(kReverb2Param_MinDelayTime, value: min(max(reverbMinDelaySeconds, 0.0001), 1))
+        engine.setReverbParameter(kReverb2Param_MaxDelayTime, value: min(max(maxDelaySeconds, 0.0001), 1))
+    }
+    ///The reverb's output level, in dB (-20 to 20).
+    public func set(reverbGainDb: Float) {
+        engine.setReverbParameter(kReverb2Param_Gain, value: min(max(reverbGainDb, -20), 20))
+    }
+    ///Which pattern of reflections the reverb uses (1 to 1000). A setting, not chance at
+    ///play time: the same value always gives the same reverb.
+    public func set(reverbReflectionPattern: Int) {
+        engine.setReverbParameter(kReverb2Param_RandomizeReflections, value: Float(min(max(reverbReflectionPattern, 1), 1000)))
+    }
+    /* A 24 dB/octave high-pass on the reverb's return, in Hz, to keep its low end from
+     muddying the mix. Needs the dry bus (setup with enableDryBus: true); nil or 0 turns
+     it off, which is how it starts. */
+    public func set(reverbHighPassFrequency: Float?) {
+        engine.setReverbHighPass(frequency: reverbHighPassFrequency)
+    }
+
     public func set(delayWetDryMix:Float) {
         engine.set(delayWetDryMix: delayWetDryMix)
     }
