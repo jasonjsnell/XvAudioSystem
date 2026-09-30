@@ -170,6 +170,34 @@ class Channel {
             return false
         }
         
+        return start(buffer: buffer, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff)
+    }
+
+    /* Plays audio the caller prepared, instead of a named file (30 Sep 2026, additive). For
+     sounds built in memory, such as a loop with a crossfade baked into its seam. The buffer
+     should be in the same format a file of that kind loads in (AVAudioFile.processingFormat). */
+    func playBuffer(
+        _ buffer: AVAudioPCMBuffer,
+        volume: Float = 1.0,
+        pitch: Float = 0.0,
+        pan: Float = 0.0,
+        loop: Bool = false,
+        filterCutoff: Float = 20000
+    ) -> Bool {
+        stopPlayback()
+        return start(buffer: buffer, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff)
+    }
+
+    //the shared second half of playSound and playBuffer: settings, then the scheduled start
+    private func start(
+        buffer: AVAudioPCMBuffer,
+        volume: Float,
+        pitch: Float,
+        pan: Float,
+        loop: Bool,
+        filterCutoff: Float
+    ) -> Bool {
+
         // Retain buffer, and make this the current sound
         stateLock.lock()
         playID += 1

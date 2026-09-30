@@ -159,6 +159,28 @@ public class XvmAudioSystem: EngineDelegate {
     }
     
 
+    /* Plays audio the caller prepared in memory, instead of a named file (30 Sep 2026,
+     additive). Returns the channel, or -1. Same settings as playSound; wet and dry need the
+     dry bus. The buffer should be in the format a file of that kind loads in
+     (AVAudioFile.processingFormat). */
+    @discardableResult
+    public func playBuffer(
+        _ buffer: AVAudioPCMBuffer,
+        volume: Float = 1.0,
+        pitch: Float = 0.0,
+        pan: Float = 0.0,
+        loop: Bool = false,
+        filterCutoff: Float = 20000,
+        wet: Float = 1.0,
+        dry: Float = 0.0
+    ) -> Int {
+        guard let channel = getAvailableChannel() else { return -1 }
+        if !engine.isRunning() { engine.startEngine() }
+        if engine.hasDryBus { channel.setSends(wet: wet, dry: dry) }
+        return channel.playBuffer(buffer, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff)
+            ? channel.id : -1
+    }
+
     // Get an available channel
     private func getAvailableChannel() -> Channel? {
         return channels.first { $0.isAvailable() }
@@ -185,6 +207,15 @@ public class XvmAudioSystem: EngineDelegate {
     public func set(filterCutoff: Float, forChannel index: Int) {
         guard index >= 0 && index < channels.count else { return }
         channels[index].setLowPassFilter(frequency: filterCutoff)
+    }
+
+    /* A sounding channel's pitch (added 30 Sep 2026, additive). In varispeed mode this is
+     the playback rate (1 as recorded, 2 an octave up, 0.5 an octave down); in time-pitch
+     mode it is cents. Changing it while the sound is audible is heard as a jump, so set it
+     while the channel is silent. */
+    public func set(pitch: Float, forChannel index: Int) {
+        guard index >= 0 && index < channels.count else { return }
+        channels[index].setPitch(pitch)
     }
 
     // Set volume for a channel
