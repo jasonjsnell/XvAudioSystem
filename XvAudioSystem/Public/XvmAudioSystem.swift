@@ -218,6 +218,12 @@ public class XvmAudioSystem: EngineDelegate {
         channels[index].setPitch(pitch)
     }
 
+    ///A sounding channel's pan, -1 (left) to 1 (right). Added 30 Sep 2026, additive.
+    public func set(pan: Float, forChannel index: Int) {
+        guard index >= 0 && index < channels.count else { return }
+        channels[index].setPan(Swift.min(Swift.max(pan, -1), 1))
+    }
+
     // Set volume for a channel
     public func set(volume: Float, forChannel index: Int) {
         guard index >= 0 && index < channels.count else { return }
