@@ -35,13 +35,19 @@ class Engine {
 
     /* DELAY BUS (7 Oct 2026, opt-in, additive). Without it the delay sits in the one
      effects chain (low-pass, delay, reverb) and everything wet goes through it. With it
-     the delay becomes its own send: channels feed this delay mixer at their own level
-     (setSends delay:), the delay runs echo-only (wet 100) and its echoes join the wet
-     path in front of the reverb, so echoes are reverberated too. The plain wet path then
-     skips the delay. Turning the bus on changes nothing until a channel sends to it. */
+     the delay becomes its own send and return, beside the reverb: channels feed this
+     delay mixer at their own level (setSends delay:), the delay runs echo-only (wet 100)
+     and its echoes go straight to the output, NOT through the reverb (an echo that went
+     into a fully wet reverb was never heard as an echo). The plain wet path skips the
+     delay. Turning the bus on changes nothing until a channel sends to it. */
     private var delayMixer: AVAudioMixerNode?
-    private var fxMixer: AVAudioMixerNode?
     private(set) var hasDelayBus = false
+    /* The delay's return mixer (a mixer, since only a mixer can set a level per
+     destination) and its two destinations: the output (clean echoes) and, at its own
+     level, the reverb. */
+    private var delayReturn: AVAudioMixerNode?
+    private var delayReturnToOutput: (mixer: AVAudioMixerNode, bus: AVAudioNodeBus)?
+    private var delayReturnToReverb: (mixer: AVAudioMixerNode, bus: AVAudioNodeBus)?
 
     /* REVERB RETURN HIGH-PASS (30 Sep 2026, dry bus only). Sits after the reverb, on the
      return, so the reverb's low end does not muddy the mix. Two 12 dB/octave high-pass
@@ -106,24 +112,6 @@ class Engine {
             setupFFT()
         }
 
-        //the delay bus: low-pass and the delay's echoes meet in an effects mixer, which feeds the reverb
-        if enableDelayBus {
-            let format = mainMixer.outputFormat(forBus: 0)
-            let delayIn = AVAudioMixerNode()
-            let fx = AVAudioMixerNode()
-            audioEngine.attach(delayIn)
-            audioEngine.attach(fx)
-            audioEngine.disconnectNodeOutput(lpfNode)
-            audioEngine.disconnectNodeOutput(delayNode)
-            audioEngine.connect(lpfNode, to: fx, fromBus: 0, toBus: 0, format: format)
-            audioEngine.connect(delayIn, to: delayNode, format: format)
-            audioEngine.connect(delayNode, to: fx, fromBus: 0, toBus: 1, format: format)
-            audioEngine.connect(fx, to: reverbNode, format: format)
-            delayNode.wetDryMix = 100 //echoes only: the sound itself arrives by the wet and dry buses
-            delayMixer = delayIn
-            fxMixer = fx
-            hasDelayBus = true
-        }
 
         //the dry bus, only when asked for: reverb and dry mixer meet in an output mixer
         if enableDryBus {
@@ -148,6 +136,51 @@ class Engine {
             dryMixer = dry
             outputMixer = output
             hasDryBus = true
+        }
+
+        /* The delay bus: the delay comes out of the effects chain (low-pass straight to
+         reverb) and becomes its own send and return, meeting the reverb and the dry bus in
+         the output mixer. Made after the dry bus, so it can use its output mixer; without
+         a dry bus it makes one. */
+        if enableDelayBus {
+            let format = mainMixer.outputFormat(forBus: 0)
+            let delayIn = AVAudioMixerNode()
+            audioEngine.attach(delayIn)
+            audioEngine.disconnectNodeOutput(lpfNode)
+            audioEngine.disconnectNodeOutput(delayNode)
+            //the reverb's input mixer: the wet path, and the delay's echoes at their own level
+            let reverbIn = AVAudioMixerNode()
+            audioEngine.attach(reverbIn)
+            audioEngine.connect(lpfNode, to: reverbIn, fromBus: 0, toBus: 0, format: format)
+            audioEngine.connect(reverbIn, to: reverbNode, format: format)
+            let output: AVAudioMixerNode
+            if let existing = outputMixer {
+                output = existing
+            } else {
+                output = AVAudioMixerNode()
+                audioEngine.attach(output)
+                audioEngine.disconnectNodeOutput(reverbNode)
+                audioEngine.connect(reverbNode, to: output, fromBus: 0, toBus: 0, format: format)
+                audioEngine.connect(output, to: audioEngine.outputNode, format: format)
+                outputMixer = output
+            }
+            let delayOut = AVAudioMixerNode()
+            audioEngine.attach(delayOut)
+            audioEngine.connect(delayIn, to: delayNode, format: format)
+            audioEngine.connect(delayNode, to: delayOut, format: format)
+            let outputBus = output.nextAvailableInputBus
+            let reverbBus = reverbIn.nextAvailableInputBus
+            audioEngine.connect(delayOut, to: [
+                AVAudioConnectionPoint(node: output, bus: outputBus),
+                AVAudioConnectionPoint(node: reverbIn, bus: reverbBus)
+            ], fromBus: 0, format: format)
+            delayReturn = delayOut
+            delayReturnToOutput = (output, outputBus)
+            delayReturnToReverb = (reverbIn, reverbBus)
+            set(delayReverbSend: 0) //clean echoes until asked otherwise
+            delayNode.wetDryMix = 100 //echoes only: the sound itself arrives by the wet and dry buses
+            delayMixer = delayIn
+            hasDelayBus = true
         }
         
         // Create channels
@@ -230,6 +263,14 @@ class Engine {
     }
     func set(delayFeedback:Float) {
         delayNode.feedback = delayFeedback
+    }
+    ///How much of the delay's return also goes into the reverb, 0 to 1 (delay bus only).
+    func set(delayReverbSend:Float) {
+        guard let delayReturn, let delayReturnToReverb else { return }
+        delayReturn.destination(forMixer: delayReturnToReverb.mixer, bus: delayReturnToReverb.bus)?.volume = max(0, min(1, delayReverbSend))
+        if let delayReturnToOutput {
+            delayReturn.destination(forMixer: delayReturnToOutput.mixer, bus: delayReturnToOutput.bus)?.volume = 1
+        }
     }
     ///The delay's own low-pass on its echoes, in Hz (10 to 22050): each echo darker than the last.
     func set(delayLowPassHz:Float) {

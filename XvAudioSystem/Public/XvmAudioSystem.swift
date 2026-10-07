@@ -55,10 +55,10 @@ public class XvmAudioSystem: EngineDelegate {
     }
 
     /* DELAY SEND (7 Oct 2026, opt-in, additive). With enableDelayBus the delay is its own
-     send: each sound sets how much of itself goes to it (the delay: of playSound,
-     playBuffer or set(wet:dry:delay:forChannel:)), the delay runs echo-only, and its
-     echoes feed the reverb, so an echo is reverberated like the sound itself. The plain wet
-     path no longer passes through the delay. Sounds that send nothing to it are unchanged.
+     send and return beside the reverb: each sound sets how much of itself goes to it (the
+     delay: of playSound, playBuffer or set(wet:dry:delay:forChannel:)), the delay runs
+     echo-only, and its echoes go straight to the output, clean of the reverb. The plain
+     wet path no longer passes through the delay. Sounds that send nothing to it are unchanged.
      Tempo: setDelayBpm; echoes: set(delayFeedback:); tone: set(delayLowPassHz:). */
     public func setup(
         withChannelTotal: Int,
@@ -296,6 +296,11 @@ public class XvmAudioSystem: EngineDelegate {
     }
     public func set(delayFeedback:Float) {
         engine.set(delayFeedback: delayFeedback)
+    }
+    /* How much of the delay's echoes also go into the reverb, 0 to 1 (delay bus only). The
+     echoes always reach the output clean; this adds a reverberated copy of them on top. */
+    public func set(delayReverbSend:Float) {
+        engine.set(delayReverbSend: delayReverbSend)
     }
     ///The delay's low-pass on its echoes, in Hz (10 to 22050). Each echo comes back darker.
     public func set(delayLowPassHz:Float) {
