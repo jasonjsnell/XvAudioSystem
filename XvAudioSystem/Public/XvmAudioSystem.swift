@@ -50,12 +50,29 @@ public class XvmAudioSystem: EngineDelegate {
         enableFFT:Bool = false,
         enableDryBus:Bool
     ) -> AudioUnit? {
+        return setup(withChannelTotal: withChannelTotal, withPitchMode: withPitchMode, enableFFT: enableFFT,
+                     enableDryBus: enableDryBus, enableDelayBus: false)
+    }
+
+    /* DELAY SEND (7 Oct 2026, opt-in, additive). With enableDelayBus the delay is its own
+     send: each sound sets how much of itself goes to it (the delay: of playSound,
+     playBuffer or set(wet:dry:delay:forChannel:)), the delay runs echo-only, and its
+     echoes feed the reverb, so an echo is reverberated like the sound itself. The plain wet
+     path no longer passes through the delay. Sounds that send nothing to it are unchanged.
+     Tempo: setDelayBpm; echoes: set(delayFeedback:); tone: set(delayLowPassHz:). */
+    public func setup(
+        withChannelTotal: Int,
+        withPitchMode:String = XvAudioConstants.kXvPitchModeTimePitch,
+        enableFFT:Bool = false,
+        enableDryBus:Bool,
+        enableDelayBus:Bool
+    ) -> AudioUnit? {
         
         channelTotal = withChannelTotal
         pitchMode = withPitchMode
 
         // Setup the engine and channels
-        if let remoteIOUnitForAudioBus:AudioUnit = engine.setup(withChannelTotal: channelTotal, withPitchMode: pitchMode, enableFFT: enableFFT, enableDryBus: enableDryBus) {
+        if let remoteIOUnitForAudioBus:AudioUnit = engine.setup(withChannelTotal: channelTotal, withPitchMode: pitchMode, enableFFT: enableFFT, enableDryBus: enableDryBus, enableDelayBus: enableDelayBus) {
             
             if (enableFFT){
                 engine.delegate = self
@@ -134,7 +151,8 @@ public class XvmAudioSystem: EngineDelegate {
         loop: Bool = false,
         filterCutoff: Float = 20000,
         wet: Float,
-        dry: Float
+        dry: Float,
+        delay: Float = 0
     ) -> Int {
         
         guard let channel = getAvailableChannel() else {
@@ -148,7 +166,7 @@ public class XvmAudioSystem: EngineDelegate {
         }
 
         //channels are reused, so every sound sets its sends
-        if engine.hasDryBus { channel.setSends(wet: wet, dry: dry) }
+        if engine.hasDryBus || engine.hasDelayBus { channel.setSends(wet: wet, dry: dry, delay: delay) }
 
         if channel.playSound(name: name, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff) {
             delegate?.soundDidPlay(name: name, volume: volume, pitch: pitch, pan: pan, filterCutoff: filterCutoff)
@@ -172,11 +190,12 @@ public class XvmAudioSystem: EngineDelegate {
         loop: Bool = false,
         filterCutoff: Float = 20000,
         wet: Float = 1.0,
-        dry: Float = 0.0
+        dry: Float = 0.0,
+        delay: Float = 0
     ) -> Int {
         guard let channel = getAvailableChannel() else { return -1 }
         if !engine.isRunning() { engine.startEngine() }
-        if engine.hasDryBus { channel.setSends(wet: wet, dry: dry) }
+        if engine.hasDryBus || engine.hasDelayBus { channel.setSends(wet: wet, dry: dry, delay: delay) }
         return channel.playBuffer(buffer, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff)
             ? channel.id : -1
     }
@@ -195,10 +214,10 @@ public class XvmAudioSystem: EngineDelegate {
         channels[index].stopPlayback()
     }
 
-    ///A sounding channel's sends, each 0 to 1 (dry bus only).
-    public func set(wet: Float, dry: Float, forChannel index: Int) {
-        guard engine.hasDryBus, index >= 0 && index < channels.count else { return }
-        channels[index].setSends(wet: wet, dry: dry)
+    ///A sounding channel's sends, each 0 to 1 (dry bus only; delay needs the delay bus).
+    public func set(wet: Float, dry: Float, delay: Float = 0, forChannel index: Int) {
+        guard engine.hasDryBus || engine.hasDelayBus, index >= 0 && index < channels.count else { return }
+        channels[index].setSends(wet: wet, dry: dry, delay: delay)
     }
 
     /* A sounding channel's own low-pass filter, in Hz (20000 is open). Every channel has
@@ -277,6 +296,10 @@ public class XvmAudioSystem: EngineDelegate {
     }
     public func set(delayFeedback:Float) {
         engine.set(delayFeedback: delayFeedback)
+    }
+    ///The delay's low-pass on its echoes, in Hz (10 to 22050). Each echo comes back darker.
+    public func set(delayLowPassHz:Float) {
+        engine.set(delayLowPassHz: delayLowPassHz)
     }
     public func setLowPassFilter(frequency: Float) {
         engine.setLowPassFilter(frequency: frequency)

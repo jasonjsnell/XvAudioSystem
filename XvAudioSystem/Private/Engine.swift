@@ -33,6 +33,16 @@ class Engine {
     private var outputMixer: AVAudioMixerNode?
     private(set) var hasDryBus = false
 
+    /* DELAY BUS (7 Oct 2026, opt-in, additive). Without it the delay sits in the one
+     effects chain (low-pass, delay, reverb) and everything wet goes through it. With it
+     the delay becomes its own send: channels feed this delay mixer at their own level
+     (setSends delay:), the delay runs echo-only (wet 100) and its echoes join the wet
+     path in front of the reverb, so echoes are reverberated too. The plain wet path then
+     skips the delay. Turning the bus on changes nothing until a channel sends to it. */
+    private var delayMixer: AVAudioMixerNode?
+    private var fxMixer: AVAudioMixerNode?
+    private(set) var hasDelayBus = false
+
     /* REVERB RETURN HIGH-PASS (30 Sep 2026, dry bus only). Sits after the reverb, on the
      return, so the reverb's low end does not muddy the mix. Two 12 dB/octave high-pass
      bands at the same frequency: 24 dB/octave. Bypassed until a frequency is set, so
@@ -87,12 +97,32 @@ class Engine {
         withChannelTotal: Int,
         withPitchMode:String = XvAudioConstants.kXvPitchModeTimePitch,
         enableFFT:Bool = false,
-        enableDryBus:Bool = false
+        enableDryBus:Bool = false,
+        enableDelayBus:Bool = false
     ) -> AudioUnit? {
         
         // Set up FFT processor if needed
         if enableFFT {
             setupFFT()
+        }
+
+        //the delay bus: low-pass and the delay's echoes meet in an effects mixer, which feeds the reverb
+        if enableDelayBus {
+            let format = mainMixer.outputFormat(forBus: 0)
+            let delayIn = AVAudioMixerNode()
+            let fx = AVAudioMixerNode()
+            audioEngine.attach(delayIn)
+            audioEngine.attach(fx)
+            audioEngine.disconnectNodeOutput(lpfNode)
+            audioEngine.disconnectNodeOutput(delayNode)
+            audioEngine.connect(lpfNode, to: fx, fromBus: 0, toBus: 0, format: format)
+            audioEngine.connect(delayIn, to: delayNode, format: format)
+            audioEngine.connect(delayNode, to: fx, fromBus: 0, toBus: 1, format: format)
+            audioEngine.connect(fx, to: reverbNode, format: format)
+            delayNode.wetDryMix = 100 //echoes only: the sound itself arrives by the wet and dry buses
+            delayMixer = delayIn
+            fxMixer = fx
+            hasDelayBus = true
         }
 
         //the dry bus, only when asked for: reverb and dry mixer meet in an output mixer
@@ -128,8 +158,8 @@ class Engine {
             // Attach channel nodes to the engine
             channel.attachNodes(to: audioEngine)
             
-            // Connect channel nodes (to both buses when there is a dry bus)
-            channel.connectNodes(to: mainMixer, dryMixer: dryMixer)
+            // Connect channel nodes (to both buses when there is a dry bus, and the delay bus when there is one)
+            channel.connectNodes(to: mainMixer, dryMixer: dryMixer, delayMixer: delayMixer)
         }
         
         // Start the audio engine
@@ -200,6 +230,10 @@ class Engine {
     }
     func set(delayFeedback:Float) {
         delayNode.feedback = delayFeedback
+    }
+    ///The delay's own low-pass on its echoes, in Hz (10 to 22050): each echo darker than the last.
+    func set(delayLowPassHz:Float) {
+        delayNode.lowPassCutoff = min(max(delayLowPassHz, 10), 22050)
     }
     func set(reverbWetDryMix:Float) {
         reverbNode.wetDryMix = reverbWetDryMix * 100

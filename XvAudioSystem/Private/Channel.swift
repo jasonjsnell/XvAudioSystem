@@ -70,9 +70,11 @@ class Channel {
     //the two destinations when the engine has a dry bus (nil without one)
     private var wetDestination: (mixer: AVAudioMixerNode, bus: AVAudioNodeBus)?
     private var dryDestination: (mixer: AVAudioMixerNode, bus: AVAudioNodeBus)?
+    //and the delay send when the engine has a delay bus (nil without one)
+    private var delayDestination: (mixer: AVAudioMixerNode, bus: AVAudioNodeBus)?
 
     // Connect nodes
-    func connectNodes(to mainMixer: AVAudioMixerNode, dryMixer: AVAudioMixerNode? = nil) {
+    func connectNodes(to mainMixer: AVAudioMixerNode, dryMixer: AVAudioMixerNode? = nil, delayMixer: AVAudioMixerNode? = nil) {
         if let engine = playerNode.engine {
             // Connect nodes in the order: player -> pitch -> EQ -> mixer
             if (pitchMode == XvAudioConstants.kXvPitchModeTimePitch){
@@ -85,17 +87,23 @@ class Channel {
             
             engine.connect(eqNode, to: mixerNode, format: nil) // Connect EQ to Mixer
 
-            if let dryMixer {
-                //one output to both buses; each connection has its own level (setSends)
+            if dryMixer != nil || delayMixer != nil {
+                //one output to every bus; each connection has its own level (setSends)
                 let wetBus = mainMixer.nextAvailableInputBus
-                let dryBus = dryMixer.nextAvailableInputBus
-                engine.connect(mixerNode, to: [
-                    AVAudioConnectionPoint(node: mainMixer, bus: wetBus),
-                    AVAudioConnectionPoint(node: dryMixer, bus: dryBus)
-                ], fromBus: 0, format: nil)
+                var points = [AVAudioConnectionPoint(node: mainMixer, bus: wetBus)]
                 wetDestination = (mainMixer, wetBus)
-                dryDestination = (dryMixer, dryBus)
-                setSends(wet: 1.0, dry: 0.0) //the default: exactly as without a dry bus
+                if let dryMixer {
+                    let dryBus = dryMixer.nextAvailableInputBus
+                    points.append(AVAudioConnectionPoint(node: dryMixer, bus: dryBus))
+                    dryDestination = (dryMixer, dryBus)
+                }
+                if let delayMixer {
+                    let delayBus = delayMixer.nextAvailableInputBus
+                    points.append(AVAudioConnectionPoint(node: delayMixer, bus: delayBus))
+                    delayDestination = (delayMixer, delayBus)
+                }
+                engine.connect(mixerNode, to: points, fromBus: 0, format: nil)
+                setSends(wet: 1.0, dry: 0.0, delay: 0.0) //the default: exactly as without the buses
             } else {
                 engine.connect(mixerNode, to: mainMixer, format: nil)
             }
@@ -104,12 +112,15 @@ class Channel {
 
     /* How much of this channel goes through the effects (wet) and around them (dry), each
      0 to 1. Only with a dry bus; without one the channel always goes through the effects. */
-    func setSends(wet: Float, dry: Float) {
+    func setSends(wet: Float, dry: Float, delay: Float = 0) {
         if let wetDestination {
             mixerNode.destination(forMixer: wetDestination.mixer, bus: wetDestination.bus)?.volume = max(0, min(1, wet))
         }
         if let dryDestination {
             mixerNode.destination(forMixer: dryDestination.mixer, bus: dryDestination.bus)?.volume = max(0, min(1, dry))
+        }
+        if let delayDestination {
+            mixerNode.destination(forMixer: delayDestination.mixer, bus: delayDestination.bus)?.volume = max(0, min(1, delay))
         }
     }
 
