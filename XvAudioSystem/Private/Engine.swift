@@ -42,6 +42,76 @@ class Engine {
      delay. Turning the bus on changes nothing until a channel sends to it. */
     private var delayMixer: AVAudioMixerNode?
     private(set) var hasDelayBus = false
+
+    /* MASTER (8 Oct 2026, additive): the last stage before the output, whatever graph is
+     built above it: a mixer for the master gain, then a peak limiter. Gain 0 dB and the
+     limiter bypassed to start, so nothing changes until an app asks. */
+    private let masterMixer = AVAudioMixerNode()
+    private var limiter: AVAudioUnitEffect?
+
+    private func connectToOutput(_ node: AVAudioNode, format: AVAudioFormat) {
+        if limiter == nil {
+            let description = AudioComponentDescription(componentType: kAudioUnitType_Effect,
+                                                        componentSubType: kAudioUnitSubType_PeakLimiter,
+                                                        componentManufacturer: kAudioUnitManufacturer_Apple,
+                                                        componentFlags: 0, componentFlagsMask: 0)
+            let unit = AVAudioUnitEffect(audioComponentDescription: description)
+            unit.bypass = true
+            audioEngine.attach(masterMixer)
+            audioEngine.attach(unit)
+            audioEngine.connect(masterMixer, to: unit, format: format)
+            audioEngine.connect(unit, to: audioEngine.outputNode, format: format)
+            limiter = unit
+        }
+        audioEngine.disconnectNodeOutput(node)
+        audioEngine.connect(node, to: masterMixer, fromBus: 0, toBus: masterMixer.nextAvailableInputBus, format: format)
+    }
+
+    /* OUTPUT METER (8 Oct 2026, additive, for tuning): a tap on the very last node reports
+     the loudest peak and the average level of each second, in dB full scale, on the
+     audio thread. nil removes the tap. */
+    private var meterPeak: Float = 0
+    private var meterSquares: Double = 0
+    private var meterFrames: Int = 0
+    private var meterSeconds: Double = 1
+
+    func set(outputMeter: ((_ peakDb: Float, _ rmsDb: Float) -> Void)?, everySeconds seconds: Double) {
+        guard let limiter else { return }
+        limiter.removeTap(onBus: 0)
+        guard let outputMeter else { return }
+        meterSeconds = max(seconds, 0.1)
+        meterPeak = 0; meterSquares = 0; meterFrames = 0
+        let format = limiter.outputFormat(forBus: 0)
+        limiter.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+            guard let self, let data = buffer.floatChannelData else { return }
+            let frames = Int(buffer.frameLength), channels = Int(buffer.format.channelCount)
+            for channel in 0..<channels {
+                let samples = data[channel]
+                for frame in 0..<frames {
+                    let value = abs(samples[frame])
+                    if value > self.meterPeak { self.meterPeak = value }
+                    self.meterSquares += Double(value * value)
+                }
+            }
+            self.meterFrames += frames * channels
+            let due = Int(format.sampleRate * self.meterSeconds) * channels
+            if self.meterFrames >= due {
+                let rms = sqrt(self.meterSquares / Double(self.meterFrames))
+                let db: (Double) -> Float = { $0 > 0 ? Float(20 * log10($0)) : -120 }
+                outputMeter(db(Double(self.meterPeak)), db(rms))
+                self.meterPeak = 0; self.meterSquares = 0; self.meterFrames = 0
+            }
+        }
+    }
+
+    ///The master gain in dB (-60 to +24), on everything the app plays.
+    func set(masterGainDb: Float) {
+        masterMixer.outputVolume = powf(10, min(max(masterGainDb, -60), 24) / 20)
+    }
+    ///The peak limiter on the output, on or off (off to start).
+    func set(limiterEnabled: Bool) {
+        limiter?.bypass = !limiterEnabled
+    }
     /* The delay's return mixer (a mixer, since only a mixer can set a level per
      destination) and its two destinations: the output (clean echoes) and, at its own
      level, the reverb. */
@@ -96,7 +166,7 @@ class Engine {
         audioEngine.connect(mainMixer,  to: lpfNode, format: mainMixer.outputFormat(forBus: 0))
         audioEngine.connect(lpfNode,    to: delayNode, format: mainMixer.outputFormat(forBus: 0))
         audioEngine.connect(delayNode,  to: reverbNode, format: mainMixer.outputFormat(forBus: 0))
-        audioEngine.connect(reverbNode, to: audioEngine.outputNode, format: mainMixer.outputFormat(forBus: 0))
+        connectToOutput(reverbNode, format: mainMixer.outputFormat(forBus: 0))
     }
     
     func setup(
@@ -132,7 +202,7 @@ class Engine {
             audioEngine.connect(highPass, to: output, fromBus: 0, toBus: 0, format: format)
             reverbHighPass = highPass
             audioEngine.connect(dry, to: output, fromBus: 0, toBus: 1, format: format)
-            audioEngine.connect(output, to: audioEngine.outputNode, format: format)
+            connectToOutput(output, format: format)
             dryMixer = dry
             outputMixer = output
             hasDryBus = true
@@ -161,7 +231,7 @@ class Engine {
                 audioEngine.attach(output)
                 audioEngine.disconnectNodeOutput(reverbNode)
                 audioEngine.connect(reverbNode, to: output, fromBus: 0, toBus: 0, format: format)
-                audioEngine.connect(output, to: audioEngine.outputNode, format: format)
+                connectToOutput(output, format: format)
                 outputMixer = output
             }
             let delayOut = AVAudioMixerNode()

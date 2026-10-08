@@ -237,6 +237,13 @@ public class XvmAudioSystem: EngineDelegate {
         channels[index].setPitch(pitch)
     }
 
+    /* A sounding channel's own high-pass filter, in Hz (7 Oct 2026, additive). Every
+     channel has one, bypassed until this is called; 20 or under bypasses it again. */
+    public func set(highPassCutoff: Float, forChannel index: Int) {
+        guard index >= 0 && index < channels.count else { return }
+        channels[index].setHighPassFilter(frequency: highPassCutoff)
+    }
+
     ///A sounding channel's pan, -1 (left) to 1 (right). Added 30 Sep 2026, additive.
     public func set(pan: Float, forChannel index: Int) {
         guard index >= 0 && index < channels.count else { return }
@@ -286,6 +293,22 @@ public class XvmAudioSystem: EngineDelegate {
      it off, which is how it starts. */
     public func set(reverbHighPassFrequency: Float?) {
         engine.setReverbHighPass(frequency: reverbHighPassFrequency)
+    }
+
+    /* MASTER (8 Oct 2026, additive). A gain on everything the app plays, in dB (0 to
+     start), and a peak limiter after it (off to start) that stops a loud moment from
+     clipping. Use the gain to set the app's overall level; turn the limiter on with it. */
+    public func set(masterGainDb: Float) {
+        engine.set(masterGainDb: masterGainDb)
+    }
+    public func set(limiterEnabled: Bool) {
+        engine.set(limiterEnabled: limiterEnabled)
+    }
+    /* A meter on the output (8 Oct 2026, additive, for tuning): called every so many
+     seconds, on the audio thread, with that stretch's loudest peak and average level in
+     dB full scale. nil turns it off. */
+    public func set(outputMeter: ((_ peakDb: Float, _ rmsDb: Float) -> Void)?, everySeconds seconds: Double = 1) {
+        engine.set(outputMeter: outputMeter, everySeconds: seconds)
     }
 
     public func set(delayWetDryMix:Float) {

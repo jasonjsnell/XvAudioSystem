@@ -8,7 +8,8 @@ class Channel {
     private let playerNode:AVAudioPlayerNode = AVAudioPlayerNode()
     private let timePitchNode:AVAudioUnitTimePitch = AVAudioUnitTimePitch()
     private let varispeedPitchNode:AVAudioUnitVarispeed = AVAudioUnitVarispeed()
-    private let eqNode: AVAudioUnitEQ = AVAudioUnitEQ(numberOfBands: 1)
+    //band 0: the low-pass every channel has had; band 1: a high-pass, bypassed until asked for (7 Oct 2026, additive)
+    private let eqNode: AVAudioUnitEQ = AVAudioUnitEQ(numberOfBands: 2)
         
     private let mixerNode: AVAudioMixerNode
     
@@ -47,6 +48,14 @@ class Channel {
             filterParams.frequency = 20000  // Default to max freq (no filter effect)
             filterParams.bandwidth = 0.5    // Bandwidth in octaves
             filterParams.bypass = false
+        }
+        // The high-pass: bypassed, so a channel sounds exactly as before until it is set
+        if eqNode.bands.count > 1 {
+            let highPass = eqNode.bands[1]
+            highPass.filterType = .highPass
+            highPass.frequency = 20
+            highPass.bandwidth = 0.5
+            highPass.bypass = true
         }
     }
 
@@ -308,6 +317,18 @@ class Channel {
     func setLowPassFilter(frequency: Float) {
         if let filterParams = eqNode.bands.first {
             filterParams.frequency = frequency
+        }
+    }
+
+    ///The high-pass cutoff in Hz. 20 or under bypasses it (the channel's default).
+    func setHighPassFilter(frequency: Float) {
+        guard eqNode.bands.count > 1 else { return }
+        let highPass = eqNode.bands[1]
+        if frequency <= 20 {
+            highPass.bypass = true
+        } else {
+            highPass.frequency = frequency
+            highPass.bypass = false
         }
     }
     
