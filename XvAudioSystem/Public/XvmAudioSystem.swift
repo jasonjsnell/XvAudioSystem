@@ -152,21 +152,23 @@ public class XvmAudioSystem: EngineDelegate {
         filterCutoff: Float = 20000,
         wet: Float,
         dry: Float,
-        delay: Float = 0
+        delay: Float = 0,
+        highPassCutoff: Float = 20
     ) -> Int {
-        
+
         guard let channel = getAvailableChannel() else {
             if debug { print("AUDIO SYS: All channels are busy.") }
             return -1
         }
-        
+
         //make sure engine is running before calling the channel to play
         if !engine.isRunning() {
             engine.startEngine()
         }
 
-        //channels are reused, so every sound sets its sends
+        //channels are reused, so every sound sets its sends and its high-pass (9 Oct 2026, additive: 20 is none)
         if engine.hasDryBus || engine.hasDelayBus { channel.setSends(wet: wet, dry: dry, delay: delay) }
+        channel.setHighPassFilter(frequency: highPassCutoff)
 
         if channel.playSound(name: name, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff) {
             delegate?.soundDidPlay(name: name, volume: volume, pitch: pitch, pan: pan, filterCutoff: filterCutoff)
@@ -191,11 +193,13 @@ public class XvmAudioSystem: EngineDelegate {
         filterCutoff: Float = 20000,
         wet: Float = 1.0,
         dry: Float = 0.0,
-        delay: Float = 0
+        delay: Float = 0,
+        highPassCutoff: Float = 20
     ) -> Int {
         guard let channel = getAvailableChannel() else { return -1 }
         if !engine.isRunning() { engine.startEngine() }
         if engine.hasDryBus || engine.hasDelayBus { channel.setSends(wet: wet, dry: dry, delay: delay) }
+        channel.setHighPassFilter(frequency: highPassCutoff) //channels are reused (9 Oct 2026, additive)
         return channel.playBuffer(buffer, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff)
             ? channel.id : -1
     }
