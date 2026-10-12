@@ -147,8 +147,8 @@ class Channel {
         
         //print("XvAudioSystem: Channel: playSound: name", name, "volume", volume, "pitch", pitch, "pan", pan, "loop", loop)
         
-        // Stop previous playback
-        stopPlayback()
+        // Stop previous playback (only if something is still sounding, 12 Oct 2026)
+        stopIfSounding()
 
         // Load the audio file if not already loaded or if a different file is requested
         guard let url = Bundle.main.url(forResource: name, withExtension: "wav") else {
@@ -208,8 +208,25 @@ class Channel {
         filterCutoff: Float = 20000,
         at startTime: AVAudioTime? = nil
     ) -> Bool {
-        stopPlayback()
+        stopIfSounding()
         return start(buffer: buffer, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff, at: startTime)
+    }
+
+    /* ONLY A SOUNDING CHANNEL IS STOPPED (Odyssey, 12 Oct 2026, additive). Every play used to
+     stop and reset the player first, even on a channel that had already finished (the usual
+     case: the system hands out free channels). AVAudioPlayerNode.stop waits on the engine's
+     render lock, and Xcode flagged it as a priority inversion on every note (a user-interactive
+     thread waiting on a default one). A finished channel is now left running and its next
+     sound is simply scheduled; only a channel cut off mid-sound is stopped, as before. */
+    private func stopIfSounding() {
+        stateLock.lock()
+        let sounding = isPlaying
+        if !sounding {
+            playID += 1 //any late completion or delayed start of the old sound no longer counts
+            currentBuffer = nil
+        }
+        stateLock.unlock()
+        if sounding { stopPlayback() }
     }
 
     //the shared second half of playSound and playBuffer: settings, then the scheduled start
@@ -262,10 +279,14 @@ class Channel {
                 /* .dataPlayedBack (12 Oct 2026): the channel is freed only once the sound has fully
                  left the output, not when the player has merely read the buffer, so the next sound
                  given this channel never stops, re-filters or re-routes a tail still in flight. */
-                self.playerNode.scheduleBuffer(buffer, at: nil, options: options, completionCallbackType: .dataPlayedBack) { [weak self] _ in
+                /* The start time goes on the buffer, not on play (12 Oct 2026, stopIfSounding): a
+                 finished player is left running, and play(at:) does nothing on a running player,
+                 so the buffer itself is scheduled for the host time. A player not yet running is
+                 started, and plays silence until the buffer's time. A time already past starts at once. */
+                self.playerNode.scheduleBuffer(buffer, at: startTime, options: options, completionCallbackType: .dataPlayedBack) { [weak self] _ in
                     self?.playbackComplete(playID: thisPlay)
                 }
-                self.playerNode.play(at: startTime) //a time already past starts at once
+                if !self.playerNode.isPlaying { self.playerNode.play() }
             }
             return true
         }
