@@ -308,6 +308,14 @@ public class XvmAudioSystem: EngineDelegate {
     public func set(masterGainDb: Float) {
         engine.set(masterGainDb: masterGainDb)
     }
+    /// The render thread's buffer length in seconds (12 Oct 2026, additive): longer gives each render
+    /// cycle more time (fewer dropped cycles and pops under load) for that much more latency. Call
+    /// before or after setup. Returns what the system granted.
+    @discardableResult
+    public func set(ioBufferDuration seconds: TimeInterval) -> TimeInterval {
+        return SessionManager.sharedInstance.set(preferredIOBufferDuration: seconds)
+    }
+
     public func set(limiterEnabled: Bool) {
         engine.set(limiterEnabled: limiterEnabled)
     }
