@@ -183,6 +183,8 @@ public class XvmAudioSystem: EngineDelegate {
      additive). Returns the channel, or -1. Same settings as playSound; wet and dry need the
      dry bus. The buffer should be in the format a file of that kind loads in
      (AVAudioFile.processingFormat). */
+    /// at (12 Oct 2026, additive): the host time to start at (AVAudioTime(hostTime:)), so several
+    /// sounds asked for at different moments start on the same sample. Nil: as before.
     @discardableResult
     public func playBuffer(
         _ buffer: AVAudioPCMBuffer,
@@ -194,13 +196,14 @@ public class XvmAudioSystem: EngineDelegate {
         wet: Float = 1.0,
         dry: Float = 0.0,
         delay: Float = 0,
-        highPassCutoff: Float = 20
+        highPassCutoff: Float = 20,
+        at startTime: AVAudioTime? = nil
     ) -> Int {
         guard let channel = getAvailableChannel() else { return -1 }
         if !engine.isRunning() { engine.startEngine() }
         if engine.hasDryBus || engine.hasDelayBus { channel.setSends(wet: wet, dry: dry, delay: delay) }
         channel.setHighPassFilter(frequency: highPassCutoff) //channels are reused (9 Oct 2026, additive)
-        return channel.playBuffer(buffer, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff)
+        return channel.playBuffer(buffer, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff, at: startTime)
             ? channel.id : -1
     }
 

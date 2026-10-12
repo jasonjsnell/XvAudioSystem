@@ -196,16 +196,20 @@ class Channel {
     /* Plays audio the caller prepared, instead of a named file (30 Sep 2026, additive). For
      sounds built in memory, such as a loop with a crossfade baked into its seam. The buffer
      should be in the same format a file of that kind loads in (AVAudioFile.processingFormat). */
+    /* at (Odyssey, 12 Oct 2026, additive): a host time to start at, so sounds asked for at
+     different moments can start at exactly the same sample. Nil keeps the old behaviour: the
+     start 0.1 s after the request. A time already past starts the sound at once. */
     func playBuffer(
         _ buffer: AVAudioPCMBuffer,
         volume: Float = 1.0,
         pitch: Float = 0.0,
         pan: Float = 0.0,
         loop: Bool = false,
-        filterCutoff: Float = 20000
+        filterCutoff: Float = 20000,
+        at startTime: AVAudioTime? = nil
     ) -> Bool {
         stopPlayback()
-        return start(buffer: buffer, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff)
+        return start(buffer: buffer, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff, at: startTime)
     }
 
     //the shared second half of playSound and playBuffer: settings, then the scheduled start
@@ -215,7 +219,8 @@ class Channel {
         pitch: Float,
         pan: Float,
         loop: Bool,
-        filterCutoff: Float
+        filterCutoff: Float,
+        at startTime: AVAudioTime? = nil
     ) -> Bool {
 
         // Retain buffer, and make this the current sound
@@ -242,6 +247,28 @@ class Channel {
         
         //Filter
         setLowPassFilter(frequency: filterCutoff)
+
+        /* A GIVEN START TIME (Odyssey, 12 Oct 2026, additive): the buffer is scheduled now and
+         the player told to start at that host time, so the settings above have until then to
+         apply and the sound begins on the sample asked for, however late this call ran. */
+        if let startTime {
+            Channel.scheduleQueue.async { [weak self] in
+                guard let self = self else { return }
+                self.stateLock.lock()
+                let buffer = self.playID == thisPlay ? self.currentBuffer : nil
+                self.stateLock.unlock()
+                guard let buffer else { return }
+                let options: AVAudioPlayerNodeBufferOptions = loop ? [.loops] : []
+                /* .dataPlayedBack (12 Oct 2026): the channel is freed only once the sound has fully
+                 left the output, not when the player has merely read the buffer, so the next sound
+                 given this channel never stops, re-filters or re-routes a tail still in flight. */
+                self.playerNode.scheduleBuffer(buffer, at: nil, options: options, completionCallbackType: .dataPlayedBack) { [weak self] _ in
+                    self?.playbackComplete(playID: thisPlay)
+                }
+                self.playerNode.play(at: startTime) //a time already past starts at once
+            }
+            return true
+        }
 
         // Schedule playback with looping option
         //slight delay to give channel time to apply incoming pan, volume, filter, etc
