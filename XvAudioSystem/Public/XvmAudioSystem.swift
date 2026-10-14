@@ -366,7 +366,7 @@ public class XvmAudioSystem: EngineDelegate {
         // Fade out and stop channels
         for channel in channels {
             channel.setVolume(0.0)
-            channel.stopPlayback()
+            channel.stopPlaybackNow() //the engine stops next, so every player must be stopped first (14 Oct 2026)
         }
         engine.stopEngine()
     }

@@ -325,15 +325,29 @@ class Channel {
         isPlaying = false
     }
 
-    // Stop playback
+    /* Stop playback. The channel is freed at once (its state, under the lock), and the player
+     is stopped on the schedule queue a moment later (14 Oct 2026). AVAudioPlayerNode.stop
+     waits on the audio engine's own default-priority thread; called straight from the app's
+     user-interactive sound queue that was a priority inversion (Xcode: "Hang Risk") and a
+     stall of every sound behind it. On the serial schedule queue the stop still runs before
+     any later start on this channel, so a sound asked for right after the stop is not cut. */
     func stopPlayback() {
-        playerNode.stop()
-        playerNode.reset()
         stateLock.lock()
         playID += 1 //any pending start or completion of the stopped sound no longer counts
         currentBuffer = nil
         isPlaying = false
         stateLock.unlock()
+        Channel.scheduleQueue.async { [weak self] in
+            guard let self else { return }
+            self.playerNode.stop()
+            self.playerNode.reset()
+        }
+    }
+
+    ///The same, waiting for the player to stop: for shutdown, where the engine stops next.
+    func stopPlaybackNow() {
+        stopPlayback()
+        Channel.scheduleQueue.sync {}
     }
 
     // Check if channel is playing
