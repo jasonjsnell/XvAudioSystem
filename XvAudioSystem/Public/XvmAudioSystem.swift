@@ -67,12 +67,29 @@ public class XvmAudioSystem: EngineDelegate {
         enableDryBus:Bool,
         enableDelayBus:Bool
     ) -> AudioUnit? {
-        
+        return setup(withChannelTotal: withChannelTotal, withPitchMode: withPitchMode, enableFFT: enableFFT,
+                     enableDryBus: enableDryBus, enableDelayBus: enableDelayBus, enableSpatialBus: false)
+    }
+
+    /* SPATIAL REVERB (18 Oct 2026, opt-in, additive). With enableSpatialBus a second reverb
+     sits beside the main one and is placed around the listener's head with HRTF rendering
+     (headphones). set(spatialMix:) splits the reverb input between the two, equal power;
+     setSpatial(azimuthDegrees:elevationDegrees:) moves the position. Nothing changes until
+     the mix is moved off 0. See Engine for the graph. */
+    public func setup(
+        withChannelTotal: Int,
+        withPitchMode:String = XvAudioConstants.kXvPitchModeTimePitch,
+        enableFFT:Bool = false,
+        enableDryBus:Bool,
+        enableDelayBus:Bool,
+        enableSpatialBus:Bool
+    ) -> AudioUnit? {
+
         channelTotal = withChannelTotal
         pitchMode = withPitchMode
 
         // Setup the engine and channels
-        if let remoteIOUnitForAudioBus:AudioUnit = engine.setup(withChannelTotal: channelTotal, withPitchMode: pitchMode, enableFFT: enableFFT, enableDryBus: enableDryBus, enableDelayBus: enableDelayBus) {
+        if let remoteIOUnitForAudioBus:AudioUnit = engine.setup(withChannelTotal: channelTotal, withPitchMode: pitchMode, enableFFT: enableFFT, enableDryBus: enableDryBus, enableDelayBus: enableDelayBus, enableSpatialBus: enableSpatialBus) {
             
             if (enableFFT){
                 engine.delegate = self
@@ -300,6 +317,32 @@ public class XvmAudioSystem: EngineDelegate {
      it off, which is how it starts. */
     public func set(reverbHighPassFrequency: Float?) {
         engine.setReverbHighPass(frequency: reverbHighPassFrequency)
+    }
+
+    //MARK: Spatial reverb (18 Oct 2026, additive; needs setup with enableSpatialBus: true)
+
+    ///Whether the spatial reverb bus was built.
+    public var hasSpatialBus: Bool { engine.hasSpatialBus }
+    ///How the reverb input is split, 0 to 1: 0 all main reverb, 1 all spatial, equal power between.
+    public func set(spatialMix: Float) {
+        engine.set(spatialMix: spatialMix)
+    }
+    ///The spatial reverb's position: azimuth in degrees clockwise from ahead (90 right, 180 behind, 270 left), elevation in degrees up.
+    public func setSpatial(azimuthDegrees: Float, elevationDegrees: Float = 0) {
+        engine.setSpatial(azimuthDegrees: azimuthDegrees, elevationDegrees: elevationDegrees)
+    }
+    ///The spatial reverb's preset. Set its decay and gain after it, as with the main reverb.
+    public func set(spatialReverbMode: AVAudioUnitReverbPreset) {
+        engine.set(spatialReverbMode: spatialReverbMode)
+    }
+    public func set(spatialReverbDecayLowSeconds: Float) {
+        engine.setSpatialReverbParameter(kReverb2Param_DecayTimeAt0Hz, value: min(max(spatialReverbDecayLowSeconds, 0.001), 20))
+    }
+    public func set(spatialReverbDecayHighSeconds: Float) {
+        engine.setSpatialReverbParameter(kReverb2Param_DecayTimeAtNyquist, value: min(max(spatialReverbDecayHighSeconds, 0.001), 20))
+    }
+    public func set(spatialReverbGainDb: Float) {
+        engine.setSpatialReverbParameter(kReverb2Param_Gain, value: min(max(spatialReverbGainDb, -20), 20))
     }
 
     /* MASTER (8 Oct 2026, additive). A gain on everything the app plays, in dB (0 to

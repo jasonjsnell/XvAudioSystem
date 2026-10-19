@@ -42,6 +42,25 @@ class Engine {
      delay. Turning the bus on changes nothing until a channel sends to it. */
     private var delayMixer: AVAudioMixerNode?
     private(set) var hasDelayBus = false
+    ///The reverb's input mixer, once a bus has made one (the delay bus, or the spatial bus below).
+    private var reverbIn: AVAudioMixerNode?
+
+    /* SPATIAL REVERB BUS (18 Oct 2026, opt-in, additive). A second reverb beside the main
+     one, placed around the listener's head. The reverb's input is split: one copy goes to
+     the main reverb as before, the other to this spatial reverb, whose return is summed to
+     mono and rendered through an AVAudioEnvironmentNode with head-related transfer
+     functions (HRTF, headphones only; on a speaker it plays as plain stereo). Two gain
+     mixers in front of the reverbs set the split (set(spatialMix:), equal power), and
+     setSpatial(azimuthDegrees:elevationDegrees:) moves the position. The environment's own
+     reverb and distance attenuation are off: this is a reverb that is positioned, not a
+     positioned sound with a room. Turning the bus on changes nothing until the mix is
+     moved off 0. Costs one more reverb and one HRTF render. */
+    private var spatialReverb: AVAudioUnitReverb?
+    private var spatialSource: AVAudioMixerNode?
+    private var environment: AVAudioEnvironmentNode?
+    private var reverbGain: AVAudioMixerNode?
+    private var spatialGain: AVAudioMixerNode?
+    private(set) var hasSpatialBus = false
 
     /* MASTER (8 Oct 2026, additive): the last stage before the output, whatever graph is
      built above it: a mixer for the master gain, then a peak limiter. Gain 0 dB and the
@@ -174,7 +193,8 @@ class Engine {
         withPitchMode:String = XvAudioConstants.kXvPitchModeTimePitch,
         enableFFT:Bool = false,
         enableDryBus:Bool = false,
-        enableDelayBus:Bool = false
+        enableDelayBus:Bool = false,
+        enableSpatialBus:Bool = false
     ) -> AudioUnit? {
         
         // Set up FFT processor if needed
@@ -251,8 +271,76 @@ class Engine {
             delayNode.wetDryMix = 100 //echoes only: the sound itself arrives by the wet and dry buses
             delayMixer = delayIn
             hasDelayBus = true
+            self.reverbIn = reverbIn
         }
-        
+
+        /* The spatial reverb bus (see the properties above). Made after the other buses, so
+         it can use their reverb input and output mixers; without them it makes its own. */
+        if enableSpatialBus {
+            let format = mainMixer.outputFormat(forBus: 0)
+            //the reverb's input mixer: the delay bus made one; otherwise one goes in between the delay and the reverb
+            let input: AVAudioMixerNode
+            if let existing = reverbIn {
+                input = existing
+            } else {
+                input = AVAudioMixerNode()
+                audioEngine.attach(input)
+                audioEngine.disconnectNodeOutput(delayNode)
+                audioEngine.connect(delayNode, to: input, fromBus: 0, toBus: 0, format: format)
+                audioEngine.connect(input, to: reverbNode, format: format)
+                reverbIn = input
+            }
+            //the output mixer: the dry or delay bus made one; otherwise one goes in after the reverb
+            let output: AVAudioMixerNode
+            if let existing = outputMixer {
+                output = existing
+            } else {
+                output = AVAudioMixerNode()
+                audioEngine.attach(output)
+                audioEngine.disconnectNodeOutput(reverbNode)
+                audioEngine.connect(reverbNode, to: output, fromBus: 0, toBus: 0, format: format)
+                connectToOutput(output, format: format)
+                outputMixer = output
+            }
+            //the split: a gain mixer in front of each reverb (only a mixer has a level of its own)
+            let toReverb = AVAudioMixerNode()
+            let toSpatial = AVAudioMixerNode()
+            let spatial = AVAudioUnitReverb()
+            spatial.loadFactoryPreset(.cathedral)
+            spatial.wetDryMix = 100 //reverb only: the sound itself arrives by the other buses
+            let source = AVAudioMixerNode()
+            let env = AVAudioEnvironmentNode()
+            for node in [toReverb, toSpatial, spatial, source, env] as [AVAudioNode] { audioEngine.attach(node) }
+            audioEngine.disconnectNodeOutput(input)
+            audioEngine.connect(input, to: [
+                AVAudioConnectionPoint(node: toReverb, bus: 0),
+                AVAudioConnectionPoint(node: toSpatial, bus: 0)
+            ], fromBus: 0, format: format)
+            audioEngine.connect(toReverb, to: reverbNode, format: format)
+            audioEngine.connect(toSpatial, to: spatial, format: format)
+            audioEngine.connect(spatial, to: source, format: format)
+            //the environment takes one mono source per input; the mixer sums the reverb's stereo return to mono
+            let mono = AVAudioFormat(standardFormatWithSampleRate: format.sampleRate, channels: 1) ?? format
+            audioEngine.connect(source, to: env, format: mono)
+            audioEngine.connect(env, to: output, fromBus: 0, toBus: output.nextAvailableInputBus, format: format)
+            source.renderingAlgorithm = .HRTFHQ
+            source.reverbBlend = 0
+            source.position = AVAudio3DPoint(x: 0, y: 0, z: -1) //straight ahead, one unit away
+            env.listenerPosition = AVAudio3DPoint(x: 0, y: 0, z: 0)
+            env.listenerVectorOrientation = AVAudio3DVectorOrientation(forward: AVAudio3DVector(x: 0, y: 0, z: -1), up: AVAudio3DVector(x: 0, y: 1, z: 0))
+            env.reverbParameters.enable = false
+            env.distanceAttenuationParameters.distanceAttenuationModel = .exponential
+            env.distanceAttenuationParameters.rolloffFactor = 0 //no attenuation by distance: the mix below does that
+            env.distanceAttenuationParameters.referenceDistance = 1
+            reverbGain = toReverb
+            spatialGain = toSpatial
+            spatialReverb = spatial
+            spatialSource = source
+            environment = env
+            hasSpatialBus = true
+            set(spatialMix: 0) //all main reverb until asked otherwise
+        }
+
         // Create channels
         for i in 0..<withChannelTotal {
             let channel = Channel(id: i, pitchMode: withPitchMode)
@@ -370,6 +458,42 @@ class Engine {
      Loading a preset sets all of them, so set these AFTER choosing a preset. */
     func setReverbParameter(_ parameter: AudioUnitParameterID, value: Float) {
         AudioUnitSetParameter(reverbNode.audioUnit, parameter, kAudioUnitScope_Global, 0, value, 0)
+    }
+
+    //MARK: - Spatial reverb bus (18 Oct 2026)
+
+    /* How the reverb input is split, 0 to 1: 0 all to the main reverb, 1 all to the spatial
+     reverb, equal power between. Spatial bus only. */
+    func set(spatialMix: Float) {
+        guard let reverbGain, let spatialGain else { return }
+        let mix = min(max(spatialMix, 0), 1)
+        let angle = mix * Float.pi / 2
+        reverbGain.outputVolume = cos(angle)
+        spatialGain.outputVolume = sin(angle)
+    }
+
+    /* Where the spatial reverb sits around the head: the azimuth in degrees clockwise from
+     straight ahead (0 ahead, 90 right, 180 behind, 270 left), the elevation in degrees up
+     from the ear line, one unit away. Spatial bus only. */
+    func setSpatial(azimuthDegrees: Float, elevationDegrees: Float) {
+        guard let spatialSource else { return }
+        let azimuth = azimuthDegrees * Float.pi / 180
+        let elevation = min(max(elevationDegrees, -90), 90) * Float.pi / 180
+        //the listener faces -z; x is right, y is up
+        spatialSource.position = AVAudio3DPoint(x: sin(azimuth) * cos(elevation),
+                                                y: sin(elevation),
+                                                z: -cos(azimuth) * cos(elevation))
+    }
+
+    ///The spatial reverb's preset (spatial bus only). As with the main reverb, set its finer parameters after this.
+    func set(spatialReverbMode: AVAudioUnitReverbPreset) {
+        spatialReverb?.loadFactoryPreset(spatialReverbMode)
+    }
+
+    ///The spatial reverb unit's own parameters (Apple's Reverb2), as setReverbParameter for the main reverb.
+    func setSpatialReverbParameter(_ parameter: AudioUnitParameterID, value: Float) {
+        guard let spatialReverb else { return }
+        AudioUnitSetParameter(spatialReverb.audioUnit, parameter, kAudioUnitScope_Global, 0, value, 0)
     }
     
     //MARK: - FFT
