@@ -194,7 +194,8 @@ class Engine {
         enableFFT:Bool = false,
         enableDryBus:Bool = false,
         enableDelayBus:Bool = false,
-        enableSpatialBus:Bool = false
+        enableSpatialBus:Bool = false,
+        contentSampleRate:Double? = nil //the rate the app's recordings are at (23 Oct 2026, additive): the players run at it
     ) -> AudioUnit? {
         
         // Set up FFT processor if needed
@@ -341,6 +342,7 @@ class Engine {
             set(spatialMix: 0) //all main reverb until asked otherwise
         }
 
+        let channelFormat = contentSampleRate.flatMap { AVAudioFormat(standardFormatWithSampleRate: $0, channels: 2) }
         // Create channels
         for i in 0..<withChannelTotal {
             let channel = Channel(id: i, pitchMode: withPitchMode)
@@ -350,7 +352,10 @@ class Engine {
             channel.attachNodes(to: audioEngine)
             
             // Connect channel nodes (to both buses when there is a dry bus, and the delay bus when there is one)
-            channel.connectNodes(to: mainMixer, dryMixer: dryMixer, delayMixer: delayMixer)
+            channel.connectNodes(to: mainMixer, dryMixer: dryMixer, delayMixer: delayMixer, format: channelFormat)
+        }
+        if let channelFormat, let first = channels.first {
+            print("XvAudioSystem: channels run at", channelFormat.sampleRate, "Hz; player output", first.playerOutputDescription, "; output mixer", mainMixer.outputFormat(forBus: 0).sampleRate, "Hz")
         }
         
         // Start the audio engine

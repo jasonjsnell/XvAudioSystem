@@ -82,14 +82,15 @@ public class XvmAudioSystem: EngineDelegate {
         enableFFT:Bool = false,
         enableDryBus:Bool,
         enableDelayBus:Bool,
-        enableSpatialBus:Bool
+        enableSpatialBus:Bool,
+        contentSampleRate:Double? = nil //the rate the app's recordings are at (23 Oct 2026, additive); nil leaves the players at their default
     ) -> AudioUnit? {
 
         channelTotal = withChannelTotal
         pitchMode = withPitchMode
 
         // Setup the engine and channels
-        if let remoteIOUnitForAudioBus:AudioUnit = engine.setup(withChannelTotal: channelTotal, withPitchMode: pitchMode, enableFFT: enableFFT, enableDryBus: enableDryBus, enableDelayBus: enableDelayBus, enableSpatialBus: enableSpatialBus) {
+        if let remoteIOUnitForAudioBus:AudioUnit = engine.setup(withChannelTotal: channelTotal, withPitchMode: pitchMode, enableFFT: enableFFT, enableDryBus: enableDryBus, enableDelayBus: enableDelayBus, enableSpatialBus: enableSpatialBus, contentSampleRate: contentSampleRate) {
             
             if (enableFFT){
                 engine.delegate = self
@@ -104,6 +105,18 @@ public class XvmAudioSystem: EngineDelegate {
         }
     }
     
+    /* THE PLAYERS' FORMAT (23 Oct 2026, additive). What every channel's player plays at: a
+     buffer in any other format is converted on each play (Channel.matched), which costs a
+     resample every time. An app that keeps its buffers should convert them once with
+     matchedToPlayers and keep the result. nil before setup. */
+    public var playerFormat: AVAudioFormat? {
+        channels.first?.playerOutputFormat
+    }
+    public func matchedToPlayers(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer {
+        guard let playerFormat else { return buffer }
+        return Channel.matched(buffer, to: playerFormat)
+    }
+
     public func isChannelAvailable() -> Bool {
         return channels.first { $0.isAvailable() } != nil
     }

@@ -83,15 +83,19 @@ class Channel {
     private var delayDestination: (mixer: AVAudioMixerNode, bus: AVAudioNodeBus)?
 
     // Connect nodes
-    func connectNodes(to mainMixer: AVAudioMixerNode, dryMixer: AVAudioMixerNode? = nil, delayMixer: AVAudioMixerNode? = nil) {
+    /* THE PLAYER'S FORMAT (23 Oct 2026, additive). With no format given, the engine connects a
+     player node at its default, 44.1 kHz stereo, and a buffer at another rate is played sample
+     for sample at that rate: a 48 kHz recording comes out 8% slow and flat. With a format, the
+     player and the pitch node run at the content's rate and the mixer resamples to the output. */
+    func connectNodes(to mainMixer: AVAudioMixerNode, dryMixer: AVAudioMixerNode? = nil, delayMixer: AVAudioMixerNode? = nil, format: AVAudioFormat? = nil) {
         if let engine = playerNode.engine {
             // Connect nodes in the order: player -> pitch -> EQ -> mixer
             if (pitchMode == XvAudioConstants.kXvPitchModeTimePitch){
-                engine.connect(playerNode, to: timePitchNode, format: nil)
-                engine.connect(timePitchNode, to: eqNode, format: nil)   // Connect EQ
+                engine.connect(playerNode, to: timePitchNode, format: format)
+                engine.connect(timePitchNode, to: eqNode, format: format)   // Connect EQ
             } else if (pitchMode == XvAudioConstants.kXvPitchModeVarispeed) {
-                engine.connect(playerNode, to: varispeedPitchNode, format: nil)
-                engine.connect(varispeedPitchNode, to: eqNode, format: nil)  // Connect EQ
+                engine.connect(playerNode, to: varispeedPitchNode, format: format)
+                engine.connect(varispeedPitchNode, to: eqNode, format: format)  // Connect EQ
             }
             
             engine.connect(eqNode, to: mixerNode, format: nil) // Connect EQ to Mixer
@@ -241,6 +245,10 @@ class Channel {
     ) -> Bool {
 
         // Retain buffer, and make this the current sound
+        //a buffer whose channel count differs from the player's output (a mono voice clip on a stereo
+        //graph) is copied into a buffer that matches first (23 Oct 2026, additive): scheduleBuffer
+        //throws on the mismatch, and the player's format was fixed when it was connected
+        let buffer = Channel.matched(buffer, to: playerNode.outputFormat(forBus: 0))
         stateLock.lock()
         playID += 1
         let thisPlay = playID
@@ -315,6 +323,46 @@ class Channel {
         return true
     }
 
+    /* THE SAME AUDIO IN THE PLAYER'S FORMAT (23 Oct 2026). A player node plays a buffer sample
+     for sample at its own output format, so a buffer at another rate comes out at the wrong
+     speed and pitch, and one with another channel count is refused. A buffer that differs is
+     converted here: resampled with AVAudioConverter when the rates differ, and mono copied
+     into every channel when only the channel count does. Float32 non-interleaved in and out
+     (AVAudioFile's processing format, and every buffer the app makes); a buffer the converter
+     cannot take is returned as it is. Apps that keep buffers should convert once (the public
+     matchedToPlayers) rather than on every play. */
+    static func matched(_ buffer: AVAudioPCMBuffer, to format: AVAudioFormat) -> AVAudioPCMBuffer {
+        let inChannels = Int(buffer.format.channelCount), outChannels = Int(format.channelCount)
+        guard outChannels > 0 else { return buffer }
+        let sameRate = abs(buffer.format.sampleRate - format.sampleRate) < 0.5
+        if sameRate && inChannels == outChannels { return buffer }
+        guard let outFormat = AVAudioFormat(standardFormatWithSampleRate: format.sampleRate, channels: AVAudioChannelCount(outChannels)) else { return buffer }
+        if sameRate {
+            //channels only: a straight copy
+            guard let source = buffer.floatChannelData,
+                  let out = AVAudioPCMBuffer(pcmFormat: outFormat, frameCapacity: buffer.frameLength),
+                  let target = out.floatChannelData else { return buffer }
+            let frames = Int(buffer.frameLength)
+            for channel in 0..<outChannels { target[channel].update(from: source[min(channel, inChannels - 1)], count: frames) }
+            out.frameLength = buffer.frameLength
+            return out
+        }
+        //another rate: resample (the converter also maps the channels)
+        guard let converter = AVAudioConverter(from: buffer.format, to: outFormat) else { return buffer }
+        let outFrames = AVAudioFrameCount(Double(buffer.frameLength) * format.sampleRate / buffer.format.sampleRate) + 32
+        guard let out = AVAudioPCMBuffer(pcmFormat: outFormat, frameCapacity: outFrames) else { return buffer }
+        var consumed = false
+        var error: NSError?
+        let status = converter.convert(to: out, error: &error) { _, outStatus in
+            if consumed { outStatus.pointee = .endOfStream; return nil }
+            consumed = true
+            outStatus.pointee = .haveData
+            return buffer
+        }
+        guard status != .error, error == nil else { return buffer }
+        return out
+    }
+
     //called from scheduleBuffer's completion handler above, on the audio thread
     func playbackComplete(playID finished: Int) {
         stateLock.lock()
@@ -351,6 +399,15 @@ class Channel {
     }
 
     // Check if channel is playing
+    ///What the player plays at (23 Oct 2026): for XvmAudioSystem.playerFormat.
+    var playerOutputFormat: AVAudioFormat { playerNode.outputFormat(forBus: 0) }
+
+    ///For the setup log (23 Oct 2026): the player's output rate and channel count.
+    var playerOutputDescription: String {
+        let format = playerNode.outputFormat(forBus: 0)
+        return "\(format.sampleRate) Hz x\(format.channelCount)"
+    }
+
     func isAvailable() -> Bool {
         stateLock.lock()
         defer { stateLock.unlock() }
