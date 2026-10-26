@@ -18,6 +18,17 @@ class Channel {
     // channel states
     private var looping: Bool = false
 
+    /* RESERVED (Odyssey, 26 Oct 2026, additive): a channel set aside for one caller, which the pool
+     no longer hands out (XvmAudioSystem.reserveChannel). Under stateLock with the rest of the state. */
+    private var reserved: Bool = false
+    func setReserved(_ on: Bool) {
+        stateLock.lock(); reserved = on; stateLock.unlock()
+    }
+    func isReserved() -> Bool {
+        stateLock.lock(); defer { stateLock.unlock() }
+        return reserved
+    }
+
     /* THREADS (29 Sep 2026). A channel is asked to play on the caller's thread, starts on
      the schedule queue, and is marked finished on the audio thread. The state those three
      share (busy, the buffer, which sound is current) is behind stateLock. playID counts the
@@ -230,7 +241,10 @@ class Channel {
             currentBuffer = nil
         }
         stateLock.unlock()
-        if sounding { stopPlayback() }
+        if sounding {
+            if XvmAudioSystem.logChannelCuts { print("CHANNEL | cut while still sounding: a new sound took the channel (a click can come from here)") }
+            stopPlayback()
+        }
     }
 
     //the shared second half of playSound and playBuffer: settings, then the scheduled start

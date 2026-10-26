@@ -10,6 +10,9 @@ public protocol XvAudioSystemDelegate: AnyObject {
 public class XvmAudioSystem: EngineDelegate {
     
     public weak var delegate: XvAudioSystemDelegate?
+
+    ///CHANNEL | a line when a channel is handed to a new sound while its last one is still sounding and has to be cut (26 Oct 2026, additive, testing).
+    public static var logChannelCuts = false
     
     private let debug:Bool = false
 
@@ -118,7 +121,7 @@ public class XvmAudioSystem: EngineDelegate {
     }
 
     public func isChannelAvailable() -> Bool {
-        return channels.first { $0.isAvailable() } != nil
+        return getAvailableChannel() != nil
     }
 
     //play sound with pitch as a String
@@ -237,9 +240,58 @@ public class XvmAudioSystem: EngineDelegate {
             ? channel.id : -1
     }
 
-    // Get an available channel
+    // Get an available channel (not one that is reserved, 26 Oct 2026)
     private func getAvailableChannel() -> Channel? {
-        return channels.first { $0.isAvailable() }
+        return channels.first { !$0.isReserved() && $0.isAvailable() }
+    }
+
+    /* A CHANNEL OF ITS OWN (Odyssey, 26 Oct 2026, additive). A sound that repeats, such as a
+     heartbeat, can be given one channel: reserveChannel takes a free channel out of the pool
+     and returns its id (-1 if none is free), playBuffer(onChannel:) plays on it, and
+     releaseChannel gives it back. Every beat then goes through the same player, pitch node,
+     filters and sends, set once and left alone, instead of a different channel each time with
+     its settings switched over from whatever sounded on it last. As on any channel, a sound
+     still sounding when the next is played on it is cut off. No existing call changes: the
+     pool simply no longer hands a reserved channel out. */
+    public func reserveChannel() -> Int {
+        guard let channel = getAvailableChannel() else { return -1 }
+        channel.setReserved(true)
+        return channel.id
+    }
+
+    public func releaseChannel(_ index: Int) {
+        guard index >= 0 && index < channels.count else { return }
+        channels[index].setReserved(false)
+    }
+
+    ///Whether this channel is free to play (26 Oct 2026, additive): for a caller choosing among the channels it reserved.
+    public func isAvailable(channel index: Int) -> Bool {
+        guard index >= 0 && index < channels.count else { return false }
+        return channels[index].isAvailable()
+    }
+
+    @discardableResult
+    public func playBuffer(
+        _ buffer: AVAudioPCMBuffer,
+        volume: Float = 1.0,
+        pitch: Float = 0.0,
+        pan: Float = 0.0,
+        loop: Bool = false,
+        filterCutoff: Float = 20000,
+        wet: Float = 1.0,
+        dry: Float = 0.0,
+        delay: Float = 0,
+        highPassCutoff: Float = 20,
+        at startTime: AVAudioTime? = nil,
+        onChannel index: Int
+    ) -> Int {
+        guard index >= 0 && index < channels.count else { return -1 }
+        let channel = channels[index]
+        if !engine.isRunning() { engine.startEngine() }
+        if engine.hasDryBus || engine.hasDelayBus { channel.setSends(wet: wet, dry: dry, delay: delay) }
+        channel.setHighPassFilter(frequency: highPassCutoff)
+        return channel.playBuffer(buffer, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff, at: startTime)
+            ? channel.id : -1
     }
 
     /* Frees one channel, by the id playSound returned (added 29 Sep 2026, additive: no
