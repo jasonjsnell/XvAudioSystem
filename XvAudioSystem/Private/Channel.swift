@@ -151,13 +151,17 @@ class Channel {
     // Play sound
     private var currentBuffer: AVAudioPCMBuffer?
       
+    /* fromSeconds (Odyssey, 27 Oct 2026, additive): start this far into the file, so a spoken
+       line that was interrupted can carry on from where it stopped. 0 is the start, as before.
+       Past the file's end plays nothing and returns false. */
     func playSound(
         name: String,
         volume: Float = 1.0,
         pitch: Float = 0.0,
         pan: Float = 0.0,
         loop: Bool = false,
-        filterCutoff: Float = 20000
+        filterCutoff: Float = 20000,
+        fromSeconds: Double = 0
     ) -> Bool {
         
         //print("XvAudioSystem: Channel: playSound: name", name, "volume", volume, "pitch", pitch, "pan", pan, "loop", loop)
@@ -186,12 +190,14 @@ class Channel {
             return false
         }
         
-        // Reset file read position
-        audioFile.framePosition = 0
+        // Read from the start, or from fromSeconds in (27 Oct 2026)
+        let startFrame = AVAudioFramePosition(max(0, fromSeconds) * audioFile.fileFormat.sampleRate)
+        guard startFrame < audioFile.length else { return false }
+        audioFile.framePosition = startFrame
 
-        // Create a buffer from the audio file
+        // Create a buffer from the audio file (the rest of it, after startFrame)
         let processingFormat = audioFile.processingFormat
-        let frameCount = UInt32(audioFile.length)
+        let frameCount = UInt32(audioFile.length - startFrame)
         guard let buffer = AVAudioPCMBuffer(pcmFormat: processingFormat, frameCapacity: frameCount) else {
             print("Channel: Could not create PCM buffer for \(name).")
             return false

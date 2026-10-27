@@ -186,7 +186,8 @@ public class XvmAudioSystem: EngineDelegate {
         wet: Float,
         dry: Float,
         delay: Float = 0,
-        highPassCutoff: Float = 20
+        highPassCutoff: Float = 20,
+        fromSeconds: Double = 0 //27 Oct 2026, additive: start this far into the file (an interrupted line carries on)
     ) -> Int {
 
         guard let channel = getAvailableChannel() else {
@@ -203,7 +204,7 @@ public class XvmAudioSystem: EngineDelegate {
         if engine.hasDryBus || engine.hasDelayBus { channel.setSends(wet: wet, dry: dry, delay: delay) }
         channel.setHighPassFilter(frequency: highPassCutoff)
 
-        if channel.playSound(name: name, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff) {
+        if channel.playSound(name: name, volume: volume, pitch: pitch, pan: pan, loop: loop, filterCutoff: filterCutoff, fromSeconds: fromSeconds) {
             delegate?.soundDidPlay(name: name, volume: volume, pitch: pitch, pan: pan, filterCutoff: filterCutoff)
             return channel.id
         } else {
